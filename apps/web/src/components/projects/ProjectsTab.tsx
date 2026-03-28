@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Code2, Terminal, FolderOpen, ExternalLink, GitBranch,
   RefreshCw, Square, Loader2, Search, Server, Copy, Check,
-  Play,
+  Play, Package, Hexagon, Braces, FileCode, Coffee, Diamond,
+  Cog, Folder,
 } from 'lucide-react';
 import { hubFetch, cn, formatRelativeTime } from '@/lib/utils';
 
@@ -29,9 +30,16 @@ interface CodeSession {
   startedAt: string;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  node: '📦', rust: '🦀', go: '🐹', python: '🐍',
-  java: '☕', dotnet: '🔷', cpp: '⚙️', generic: '📁',
+const TYPE_ICONS: Record<string, React.ReactNode> = {
+  node: <Package className="w-5 h-5" />,
+  rust: <Hexagon className="w-5 h-5" />,
+  go: <Braces className="w-5 h-5" />,
+  python: <FileCode className="w-5 h-5" />,
+  java: <Coffee className="w-5 h-5" />,
+  dotnet: <Diamond className="w-5 h-5" />,
+  cpp: <Cog className="w-5 h-5" />,
+  swift: <Code2 className="w-5 h-5" />,
+  generic: <Folder className="w-5 h-5" />,
 };
 
 export default function ProjectsTab({ deviceId }: Props) {
@@ -299,8 +307,11 @@ export default function ProjectsTab({ deviceId }: Props) {
                 style={isRunning ? { borderColor: 'rgba(34,197,94,0.15)', background: 'rgba(34,197,94,0.02)' } : undefined}
               >
                 {/* Icon */}
-                <div className="text-2xl flex-shrink-0 w-10 text-center">
-                  {TYPE_ICONS[project.type] || '📁'}
+                <div
+                  className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: '#f0f0f0', color: '#555' }}
+                >
+                  {TYPE_ICONS[project.type] || <Folder className="w-5 h-5" />}
                 </div>
 
                 {/* Info */}
