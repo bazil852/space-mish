@@ -23,6 +23,7 @@ import {
   createSession,
   getSession,
   closeSession,
+  closeAllSessions,
   listSessions,
   resizeSession,
   writeToSession,
@@ -253,6 +254,44 @@ app.delete('/terminal/:sessionId', (req, res) => {
   } else {
     res.status(404).json(fail('Session not found', 404));
   }
+});
+
+// ─── Session Manager Routes ─────────────────────────────────────
+// Get everything running on this agent
+app.get('/sessions', (_req, res) => {
+  res.json(ok({
+    terminals: listSessions(),
+    codeServers: getRunningInstances(),
+  }));
+});
+
+// Kill a terminal session
+app.delete('/sessions/terminal/:id', (req, res) => {
+  const closed = closeSession(req.params.id);
+  res.json(ok({ closed }));
+});
+
+// Kill all terminal sessions
+app.delete('/sessions/terminals', (_req, res) => {
+  const count = closeAllSessions();
+  res.json(ok({ killed: count }));
+});
+
+// Kill a code-server session
+app.delete('/sessions/code/:port', (req, res) => {
+  const stopped = stopCodeServer(parseInt(req.params.port, 10));
+  res.json(ok({ stopped }));
+});
+
+// Kill everything
+app.delete('/sessions/all', (_req, res) => {
+  const termCount = closeAllSessions();
+  let codeCount = 0;
+  for (const inst of getRunningInstances()) {
+    stopCodeServer(inst.port);
+    codeCount++;
+  }
+  res.json(ok({ terminalsKilled: termCount, codeServersKilled: codeCount }));
 });
 
 // ─── Project Routes ──────────────────────────────────────────────
@@ -497,6 +536,9 @@ terminalWss.on('connection', (ws: WebSocket, _req: unknown, sessionId: string) =
   ws.on('close', () => {
     dataHandler.dispose();
     exitHandler.dispose();
+    // Kill the PTY so it doesn't leak
+    closeSession(sessionId);
+    console.log(`[terminal] Session ${sessionId} closed and PTY killed`);
   });
 });
 
