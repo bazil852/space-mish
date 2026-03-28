@@ -57,9 +57,10 @@ app.use("/api/commands", commandsRouter);
 // Agents POST here on startup to register themselves with the hub
 app.post("/api/agents/register", (req, res) => {
   try {
-    const { deviceId, deviceName, os: agentOs, port, capabilities } = req.body;
-    // Get the agent's IP from the request
+    const { deviceId, deviceName, os: agentOs, port, capabilities, localIp } = req.body;
+    // Prefer the agent's self-reported IP, fall back to request IP
     const agentIp =
+      localIp ||
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket.remoteAddress?.replace("::ffff:", "") ||
       "127.0.0.1";

@@ -1,8 +1,9 @@
-import Bonjour, { Service } from 'bonjour-service';
+import Bonjour from 'bonjour-service';
 import * as http from 'http';
+import * as os from 'os';
+import * as net from 'net';
 
 let bonjourInstance: Bonjour | null = null;
-let publishedService: Service | null = null;
 
 export interface AdvertiseConfig {
   deviceId: string;
@@ -14,89 +15,138 @@ export interface AdvertiseConfig {
 }
 
 /**
- * Advertise the agent over mDNS and optionally register with the hub.
+ * Advertise the agent over mDNS and auto-discover + register with the hub.
  */
 export async function advertiseAgent(config: AdvertiseConfig): Promise<void> {
-  // Publish via Bonjour / mDNS
+  // 1. Publish via mDNS
   bonjourInstance = new Bonjour();
-  publishedService = bonjourInstance.publish({
+  bonjourInstance.publish({
     name: config.deviceName,
     type: 'spacemish',
     port: config.port,
     txt: {
       deviceId: config.deviceId,
       deviceName: config.deviceName,
+      name: config.deviceName,
       os: 'macos',
       version: config.version,
       capabilities: config.capabilities.join(','),
     },
   });
-
   console.log(`[discovery] mDNS advertised as _spacemish._tcp on port ${config.port}`);
 
-  // Register with hub if URL is provided
-  if (config.hubUrl) {
-    try {
-      await registerWithHub(config);
-      console.log(`[discovery] Registered with hub at ${config.hubUrl}`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[discovery] Failed to register with hub: ${message}`);
-    }
+  // 2. Find the hub — use explicit URL if set, otherwise scan the LAN
+  let hubUrl = config.hubUrl;
+
+  if (!hubUrl || hubUrl.includes('localhost')) {
+    console.log('[discovery] Scanning LAN for hub...');
+    hubUrl = await findHub();
+  }
+
+  if (hubUrl) {
+    await doRegister(hubUrl, config);
+    // Heartbeat every 30s
+    setInterval(() => { doRegister(hubUrl!, config).catch(() => {}); }, 30_000);
+  } else {
+    console.warn('[discovery] Hub not found yet. Retrying every 15s...');
+    const retry = setInterval(async () => {
+      const found = await findHub();
+      if (found) {
+        hubUrl = found;
+        await doRegister(found, config);
+        clearInterval(retry);
+        setInterval(() => { doRegister(hubUrl!, config).catch(() => {}); }, 30_000);
+      }
+    }, 15_000);
+  }
+}
+
+async function doRegister(hubUrl: string, config: AdvertiseConfig) {
+  try {
+    await registerWithHub(hubUrl, config);
+    console.log(`[discovery] Registered with hub at ${hubUrl}`);
+  } catch (err) {
+    console.warn(`[discovery] Registration failed: ${err instanceof Error ? err.message : err}`);
   }
 }
 
 /**
- * POST registration data to the hub.
+ * Scan the local subnet for the Space Mish hub on port 3001.
  */
-function registerWithHub(config: AdvertiseConfig): Promise<void> {
+async function findHub(): Promise<string | null> {
+  const localIp = getLocalIp();
+  if (!localIp) return null;
+
+  const subnet = localIp.split('.').slice(0, 3).join('.');
+  console.log(`[discovery] Scanning ${subnet}.1-254 for hub...`);
+
+  const checks = [];
+  for (let i = 1; i <= 254; i++) {
+    const ip = `${subnet}.${i}`;
+    if (ip === localIp) continue;
+    checks.push(checkHub(ip));
+  }
+
+  const results = await Promise.all(checks);
+  return results.find(r => r !== null) || null;
+}
+
+function checkHub(ip: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(400);
+    socket.on('connect', () => {
+      socket.destroy();
+      const req = http.get(`http://${ip}:3001/health`, { timeout: 1500 }, (res) => {
+        let body = '';
+        res.on('data', (c) => { body += c; });
+        res.on('end', () => resolve(body.includes('space-mish') ? `http://${ip}:3001` : null));
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    });
+    socket.on('timeout', () => { socket.destroy(); resolve(null); });
+    socket.on('error', () => { socket.destroy(); resolve(null); });
+    socket.connect(3001, ip);
+  });
+}
+
+function getLocalIp(): string | null {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces || []) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+}
+
+function registerWithHub(hubUrl: string, config: AdvertiseConfig): Promise<void> {
   return new Promise((resolve, reject) => {
-    const url = new URL('/api/agents/register', config.hubUrl);
+    const localIp = getLocalIp() || '0.0.0.0';
     const body = JSON.stringify({
       deviceId: config.deviceId,
       deviceName: config.deviceName,
       os: 'macos',
       version: config.version,
       port: config.port,
+      localIp,
       capabilities: config.capabilities,
     });
 
-    const req = http.request(
-      url,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Hub responded with status ${res.statusCode}`));
-        }
-        res.resume();
-      },
-    );
-
+    const url = new URL('/api/agents/register', hubUrl);
+    const req = http.request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, (res) => {
+      res.statusCode && res.statusCode < 300 ? resolve() : reject(new Error(`Status ${res.statusCode}`));
+      res.resume();
+    });
     req.on('error', reject);
     req.write(body);
     req.end();
   });
 }
 
-/**
- * Stop mDNS advertising and clean up.
- */
 export function stopAdvertising(): void {
-  if (publishedService) {
-    publishedService.stop?.();
-    publishedService = null;
-  }
-  if (bonjourInstance) {
-    bonjourInstance.destroy();
-    bonjourInstance = null;
-  }
-  console.log('[discovery] Stopped advertising');
+  if (bonjourInstance) { bonjourInstance.unpublishAll(); bonjourInstance.destroy(); bonjourInstance = null; }
 }
