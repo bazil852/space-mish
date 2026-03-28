@@ -84,8 +84,16 @@ export function discoverProjects(): DiscoveredProject[] {
         const stat = fs.statSync(fullPath);
         if (!stat.isDirectory()) continue;
 
-        // Skip hidden dirs, node_modules, etc.
-        if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') continue;
+        // Skip hidden dirs, system dirs, junk
+        if (entry.startsWith('.') || entry.startsWith('$') || entry.startsWith('~')) continue;
+        const lower = entry.toLowerCase();
+        if ([
+          'node_modules', '__pycache__', '.git', 'dist', 'build', 'out',
+          'appdata', 'application data', 'local settings', 'ntuser.dat',
+          'desktop.ini', 'thumbs.db', 'recycle.bin', '$recycle.bin',
+          'system volume information', 'recovery', 'windows',
+          'program files', 'program files (x86)', 'programdata',
+        ].includes(lower)) continue;
 
         // Check for project markers
         const markers: string[] = [];
@@ -119,11 +127,8 @@ export function discoverProjects(): DiscoveredProject[] {
 
         const hasGit = subEntries.includes('.git');
 
-        // If it has a .git folder, it's a project even without markers
-        if (hasGit) isProject = true;
-
-        // Also include folders that have subdirectories (likely workspace folders)
-        // but only if they're in the root scan dirs
+        // Must have at least one real project marker (package.json, Cargo.toml, etc.)
+        // .git alone is not enough — too many false positives
         if (!isProject) continue;
 
         const id = crypto.createHash('sha256')
@@ -160,67 +165,8 @@ export function getProjectIcon(type: string): string {
 }
 
 /**
- * Scan deeper for projects (2 levels deep) — useful for monorepos or workspace folders.
+ * Alias for discoverProjects — deep scan removed to avoid picking up junk.
  */
 export function discoverProjectsDeep(): DiscoveredProject[] {
-  const shallow = discoverProjects();
-
-  // Also check one level inside each root for sub-projects
-  const roots = getProjectRoots();
-  const deepProjects: DiscoveredProject[] = [];
-
-  for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
-    try {
-      const entries = fs.readdirSync(root);
-      for (const entry of entries) {
-        const subDir = path.join(root, entry);
-        try {
-          const stat = fs.statSync(subDir);
-          if (!stat.isDirectory() || entry.startsWith('.')) continue;
-
-          // Check sub-entries for more projects
-          const subEntries = fs.readdirSync(subDir);
-          for (const subEntry of subEntries) {
-            const deepPath = path.join(subDir, subEntry);
-            try {
-              const deepStat = fs.statSync(deepPath);
-              if (!deepStat.isDirectory() || subEntry.startsWith('.')) continue;
-
-              const deepContents = fs.readdirSync(deepPath);
-              const hasMarker = Object.keys(PROJECT_MARKERS).some(m =>
-                m.startsWith('*') ? deepContents.some(f => f.endsWith(m.slice(1))) : deepContents.includes(m)
-              );
-              const hasGit = deepContents.includes('.git');
-
-              if (hasMarker || hasGit) {
-                // Only add if not already in shallow results
-                if (!shallow.some(p => p.path === deepPath)) {
-                  const id = crypto.createHash('sha256').update(deepPath).digest('hex').slice(0, 12);
-                  let type = 'generic';
-                  for (const [marker, t] of Object.entries(PROJECT_MARKERS)) {
-                    if (marker.startsWith('*') ? deepContents.some(f => f.endsWith(marker.slice(1))) : deepContents.includes(marker)) {
-                      type = t;
-                      break;
-                    }
-                  }
-                  deepProjects.push({
-                    id,
-                    name: `${entry}/${subEntry}`,
-                    path: deepPath,
-                    type,
-                    markers: [],
-                    hasGit,
-                    lastModified: deepStat.mtime.toISOString(),
-                  });
-                }
-              }
-            } catch { continue; }
-          }
-        } catch { continue; }
-      }
-    } catch { continue; }
-  }
-
-  return [...shallow, ...deepProjects];
+  return discoverProjects();
 }
