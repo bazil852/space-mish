@@ -41,7 +41,12 @@ app.use((req, _res, next) => {
 // ─── Health check ────────────────────────────────────────────────
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "space-mish-hub", uptime: process.uptime() });
+  res.json({
+    ok: true,
+    service: "space-mish-hub",
+    uptime: process.uptime(),
+    tunnelUrl: process.env.TUNNEL_URL || null,
+  });
 });
 
 // ─── Mount API routes ────────────────────────────────────────────
