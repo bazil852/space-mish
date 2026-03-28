@@ -1,0 +1,26 @@
+{
+  "name": "space-mish",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Space Mish — Browser-based device control hub for personal devices",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "agents/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:hub\" \"npm run dev:web\"",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:hub": "npm run dev --workspace=agents/hub",
+    "dev:agent:macos": "npm run dev --workspace=agents/macos",
+    "dev:agent:windows": "npm run dev --workspace=agents/windows",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "lint": "npm run lint --workspace=apps/web",
+    "setup": "npm install && npm run build:shared"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.0"
+  }
+}

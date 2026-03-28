@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0f2e"/>
+      <stop offset="100%" style="stop-color:#050816"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Orbit ring -->
+  <ellipse cx="256" cy="256" rx="160" ry="60" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.3" transform="rotate(-20 256 256)"/>
+  <!-- Satellite body -->
+  <rect x="230" y="220" width="52" height="72" rx="8" fill="url(#accent)" opacity="0.9"/>
+  <!-- Solar panels -->
+  <rect x="160" y="240" width="60" height="32" rx="4" fill="#3b82f6" opacity="0.7"/>
+  <rect x="292" y="240" width="60" height="32" rx="4" fill="#3b82f6" opacity="0.7"/>
+  <!-- Panel lines -->
+  <line x1="180" y1="240" x2="180" y2="272" stroke="#1e3a8a" stroke-width="1"/>
+  <line x1="200" y1="240" x2="200" y2="272" stroke="#1e3a8a" stroke-width="1"/>
+  <line x1="312" y1="240" x2="312" y2="272" stroke="#1e3a8a" stroke-width="1"/>
+  <line x1="332" y1="240" x2="332" y2="272" stroke="#1e3a8a" stroke-width="1"/>
+  <!-- Antenna -->
+  <line x1="256" y1="220" x2="256" y2="190" stroke="#60a5fa" stroke-width="2"/>
+  <circle cx="256" cy="186" r="4" fill="#60a5fa"/>
+  <!-- Stars -->
+  <circle cx="100" cy="100" r="2" fill="white" opacity="0.6"/>
+  <circle cx="400" cy="80" r="1.5" fill="white" opacity="0.5"/>
+  <circle cx="420" cy="400" r="2" fill="white" opacity="0.4"/>
+  <circle cx="80" cy="380" r="1.5" fill="white" opacity="0.5"/>
+  <circle cx="350" cy="150" r="1" fill="white" opacity="0.3"/>
+  <circle cx="150" cy="350" r="1" fill="white" opacity="0.3"/>
+</svg>
