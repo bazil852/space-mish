@@ -74,6 +74,12 @@ async function doRegister(hubUrl: string, config: AdvertiseConfig) {
  * Scan the local subnet for the Space Mish hub on port 3001.
  */
 async function findHub(): Promise<string | null> {
+  // Check localhost first — hub might be on the same machine
+  console.log(`[discovery] Checking localhost:3001...`);
+  const local = await checkHub('127.0.0.1', 3001);
+  if (local) return local;
+
+  // Scan the LAN
   const localIp = getLocalIp();
   if (!localIp) return null;
 
@@ -83,8 +89,6 @@ async function findHub(): Promise<string | null> {
   const checks: Promise<string | null>[] = [];
   for (let i = 1; i <= 254; i++) {
     const ip = `${subnet}.${i}`;
-    if (ip === localIp) continue;
-    // Check port 3001 (hub direct) and port 3000 (web app proxy)
     checks.push(checkHub(ip, 3001));
     checks.push(checkHub(ip, 3000));
   }

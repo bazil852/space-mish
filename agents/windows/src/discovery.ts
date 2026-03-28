@@ -64,6 +64,12 @@ async function doRegister(hubUrl: string, config: AdvertiseConfig) {
 }
 
 async function findHub(): Promise<string | null> {
+  // Check localhost first — hub and agent are often on the same machine
+  console.log(`[discovery] Checking localhost:3001...`);
+  const local = await checkHub('127.0.0.1');
+  if (local) return local;
+
+  // Scan the LAN
   const localIp = getLocalIp();
   if (!localIp) return null;
   const subnet = localIp.split('.').slice(0, 3).join('.');
@@ -72,7 +78,6 @@ async function findHub(): Promise<string | null> {
   const checks = [];
   for (let i = 1; i <= 254; i++) {
     const ip = `${subnet}.${i}`;
-    if (ip === localIp) continue;
     checks.push(checkHub(ip));
   }
   const results = await Promise.all(checks);
