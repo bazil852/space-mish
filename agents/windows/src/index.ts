@@ -41,6 +41,13 @@ import {
   stopCodeServer,
   getRunningInstances,
 } from './code-server';
+import {
+  captureScreenshot,
+  getScreenSize,
+  injectInput,
+  initRemote,
+  type InputEvent,
+} from './remote';
 
 import type { AgentCapabilityDoc, ApiResponse } from '../../../packages/shared/src/types';
 
@@ -324,11 +331,54 @@ app.post('/commands/run', (req, res) => {
   }
 });
 
-// ─── WebSocket for Terminal Streaming ────────────────────────────
-const wss = new WebSocketServer({ noServer: true });
+// ─── Remote View Routes ─────────────────────────────────────────
+app.get('/remote/screenshot', (_req, res) => {
+  const quality = parseInt((_req.query.quality as string) || '50', 10);
+  const buffer = captureScreenshot(quality);
+  if (buffer) {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(buffer);
+  } else {
+    res.status(500).json(fail('Screenshot capture failed'));
+  }
+});
+
+app.get('/remote/screen-info', (_req, res) => {
+  const size = getScreenSize();
+  res.json(ok(size));
+});
+
+app.post('/remote/input', (req, res) => {
+  try {
+    const event = req.body as InputEvent;
+    if (!event.action) {
+      res.status(400).json(fail('Missing action'));
+      return;
+    }
+    injectInput(event);
+    res.json(ok({ injected: true }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json(fail(message));
+  }
+});
+
+// ─── WebSocket for Terminal + Remote Streaming ──────────────────
+const terminalWss = new WebSocketServer({ noServer: true });
+const remoteWss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (req, socket, head) => {
   const url = req.url || '';
+
+  // Match /remote/stream
+  if (url.startsWith('/remote/stream')) {
+    remoteWss.handleUpgrade(req, socket, head, (ws) => {
+      remoteWss.emit('connection', ws, req);
+    });
+    return;
+  }
+
   // Match /terminal/:sessionId
   const match = url.match(/^\/terminal\/([a-f0-9-]+)$/);
   if (!match) {
@@ -343,12 +393,62 @@ server.on('upgrade', (req, socket, head) => {
     return;
   }
 
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    wss.emit('connection', ws, req, sessionId);
+  terminalWss.handleUpgrade(req, socket, head, (ws) => {
+    terminalWss.emit('connection', ws, req, sessionId);
   });
 });
 
-wss.on('connection', (ws: WebSocket, _req: unknown, sessionId: string) => {
+// ─── Remote Stream WebSocket ────────────────────────────────────
+remoteWss.on('connection', (ws: WebSocket) => {
+  console.log('[remote] Stream client connected');
+  let streaming = true;
+  let quality = 40;
+  let interval = 300; // ms between frames (~3 FPS)
+
+  const streamLoop = async () => {
+    while (streaming && ws.readyState === WebSocket.OPEN) {
+      try {
+        const frame = captureScreenshot(quality);
+        if (frame && ws.readyState === WebSocket.OPEN) {
+          ws.send(frame);
+        }
+      } catch {
+        // Skip frame on error
+      }
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+  };
+
+  // Handle messages from browser (input events + settings)
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'input') {
+        injectInput(msg.event as InputEvent);
+      } else if (msg.type === 'settings') {
+        if (msg.quality) quality = Math.max(10, Math.min(90, msg.quality));
+        if (msg.fps) interval = Math.max(100, Math.round(1000 / msg.fps));
+      }
+    } catch {
+      // Ignore malformed messages
+    }
+  });
+
+  ws.on('close', () => {
+    streaming = false;
+    console.log('[remote] Stream client disconnected');
+  });
+
+  ws.on('error', () => {
+    streaming = false;
+  });
+
+  // Start streaming
+  streamLoop();
+});
+
+// ─── Terminal WebSocket ──────────────────────────────────────────
+terminalWss.on('connection', (ws: WebSocket, _req: unknown, sessionId: string) => {
   const session = getSession(sessionId);
   if (!session) {
     ws.close(1008, 'Session not found');

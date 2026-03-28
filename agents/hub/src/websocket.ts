@@ -5,6 +5,7 @@ import { getAgentUrl } from "./agentProxy";
 
 let generalWss: WebSocketServer;
 let terminalWss: WebSocketServer;
+let remoteWss: WebSocketServer;
 const clients = new Set<WebSocket>();
 
 /**
@@ -15,6 +16,7 @@ const clients = new Set<WebSocket>();
 export function setupWebSocket(server: HttpServer): void {
   generalWss = new WebSocketServer({ noServer: true });
   terminalWss = new WebSocketServer({ noServer: true });
+  remoteWss = new WebSocketServer({ noServer: true });
 
   // Route upgrade requests to the correct WSS
   server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -23,6 +25,10 @@ export function setupWebSocket(server: HttpServer): void {
     if (url === "/ws" || url === "/ws/") {
       generalWss.handleUpgrade(req, socket, head, (ws) => {
         generalWss.emit("connection", ws, req);
+      });
+    } else if (url.startsWith("/remote/")) {
+      remoteWss.handleUpgrade(req, socket, head, (ws) => {
+        remoteWss.emit("connection", ws, req);
       });
     } else if (url.startsWith("/terminal/")) {
       terminalWss.handleUpgrade(req, socket, head, (ws) => {
@@ -192,7 +198,76 @@ export function setupWebSocket(server: HttpServer): void {
     });
   });
 
-  console.log("[ws] WebSocket server ready (/ws + /terminal/*)");
+  // ─── Remote View WS Proxy ────────────────────────────────────────
+  remoteWss.on("connection", (browserWs: WebSocket, req: IncomingMessage) => {
+    const url = req.url || "";
+    // Parse /remote/:deviceId
+    const deviceId = url.replace(/^\/remote\//, "").split("/")[0];
+
+    if (!deviceId) {
+      browserWs.close(1008, "Missing deviceId");
+      return;
+    }
+
+    const agentUrl = getAgentUrl(deviceId);
+    if (!agentUrl) {
+      browserWs.close(1008, "Device not found or offline");
+      return;
+    }
+
+    console.log(`[remote] Browser requesting remote view for device ${deviceId}`);
+
+    const agentWsUrl = agentUrl.replace(/^http/, "ws") + "/remote/stream";
+    let agentWs: WebSocket;
+    try {
+      agentWs = new WebSocket(agentWsUrl);
+    } catch {
+      browserWs.close(1008, "Cannot connect to agent remote stream");
+      return;
+    }
+
+    agentWs.binaryType = "arraybuffer";
+
+    agentWs.on("open", () => {
+      console.log(`[remote] Proxying: browser <-> agent (${deviceId})`);
+    });
+
+    // Agent → Browser: forward screenshot frames (binary)
+    agentWs.on("message", (data, isBinary) => {
+      if (browserWs.readyState === WebSocket.OPEN) {
+        browserWs.send(data, { binary: isBinary });
+      }
+    });
+
+    // Browser → Agent: forward input events + settings (JSON)
+    browserWs.on("message", (raw) => {
+      if (agentWs.readyState === WebSocket.OPEN) {
+        agentWs.send(raw.toString());
+      }
+    });
+
+    browserWs.on("close", () => {
+      console.log(`[remote] Browser disconnected (${deviceId})`);
+      if (agentWs.readyState === WebSocket.OPEN) agentWs.close();
+    });
+
+    agentWs.on("close", () => {
+      console.log(`[remote] Agent stream closed (${deviceId})`);
+      if (browserWs.readyState === WebSocket.OPEN) browserWs.close();
+    });
+
+    agentWs.on("error", (err) => {
+      console.error(`[remote] Agent WS error:`, err.message);
+      if (browserWs.readyState === WebSocket.OPEN) browserWs.close(1008, "Agent error");
+    });
+
+    browserWs.on("error", (err) => {
+      console.error(`[remote] Browser WS error:`, err.message);
+      if (agentWs.readyState === WebSocket.OPEN) agentWs.close();
+    });
+  });
+
+  console.log("[ws] WebSocket server ready (/ws + /terminal/* + /remote/*)");
 }
 
 /**
