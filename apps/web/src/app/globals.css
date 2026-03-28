@@ -4,10 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Fonts ────────────────────────────────────────────────────── */
+/* ---- Fonts --------------------------------------------------------- */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ─── Base ─────────────────────────────────────────────────────── */
+/* ---- Base ---------------------------------------------------------- */
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -47,7 +47,7 @@
   }
 }
 
-/* ─── Starfield Background ─────────────────────────────────────── */
+/* ---- Starfield Background ------------------------------------------ */
 .starfield {
   position: fixed;
   inset: 0;
@@ -107,29 +107,30 @@
   animation: twinkle 12s ease-in-out infinite alternate-reverse;
 }
 
-/* ─── Glass Card ───────────────────────────────────────────────── */
+/* ---- Glass Card ---------------------------------------------------- */
 @layer components {
   .glass-card {
     background: rgba(10, 15, 46, 0.55);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.1);
     border-radius: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .glass-card:hover {
-    border-color: rgba(59, 130, 246, 0.28);
+    border-color: rgba(59, 130, 246, 0.22);
     box-shadow:
-      0 0 30px rgba(59, 130, 246, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 8px 32px rgba(0, 0, 0, 0.2),
+      0 0 24px rgba(59, 130, 246, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .glass-card-solid {
     background: rgba(16, 24, 64, 0.85);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.12);
     border-radius: 16px;
   }
 
@@ -166,7 +167,7 @@
   .cosmic-button:hover {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(59, 130, 246, 0.2));
     border-color: rgba(59, 130, 246, 0.4);
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
     transform: translateY(-1px);
   }
   .cosmic-button:active {
@@ -180,7 +181,7 @@
   }
   .cosmic-button-primary:hover {
     background: linear-gradient(135deg, #60a5fa, #3b82f6);
-    box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
   }
 
   .cosmic-input {
@@ -197,17 +198,17 @@
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
-  /* ─── Status Indicators ──────────────────────────────────────── */
+  /* ---- Status Indicators ------------------------------------------- */
   .status-online {
     @apply w-2.5 h-2.5 rounded-full;
     background: #34d399;
-    box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
-    animation: pulseGlow 2s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+    animation: pulseGlow 2.5s ease-in-out infinite;
   }
 
   .status-offline {
     @apply w-2.5 h-2.5 rounded-full;
-    background: #64748b;
+    background: #475569;
   }
 
   .status-stale {
@@ -216,7 +217,7 @@
     box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
   }
 
-  /* ─── Orbit Ring ─────────────────────────────────────────────── */
+  /* ---- Orbit Ring -------------------------------------------------- */
   .orbit-ring {
     position: absolute;
     border: 1px solid rgba(59, 130, 246, 0.06);
@@ -224,7 +225,7 @@
     pointer-events: none;
   }
 
-  /* ─── Tab Navigation ─────────────────────────────────────────── */
+  /* ---- Tab Navigation ---------------------------------------------- */
   .tab-active {
     @apply relative;
     color: #eef2ff;
@@ -240,7 +241,7 @@
     border-radius: 1px;
   }
 
-  /* ─── Staggered Animations ───────────────────────────────────── */
+  /* ---- Staggered Animations ---------------------------------------- */
   .stagger-1 { animation-delay: 0.05s; }
   .stagger-2 { animation-delay: 0.1s; }
   .stagger-3 { animation-delay: 0.15s; }
@@ -251,7 +252,7 @@
   .stagger-8 { animation-delay: 0.4s; }
 }
 
-/* ─── Nebula Glow Accent ───────────────────────────────────────── */
+/* ---- Nebula Glow Accent -------------------------------------------- */
 .nebula-glow {
   position: fixed;
   width: 600px;
@@ -275,7 +276,7 @@
   background: radial-gradient(circle, #06b6d4, transparent);
 }
 
-/* ─── Grid overlay ─────────────────────────────────────────────── */
+/* ---- Grid overlay -------------------------------------------------- */
 .cockpit-grid {
   position: fixed;
   inset: 0;
@@ -288,7 +289,7 @@
   -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.3) 0%, transparent 70%);
 }
 
-/* ─── XTerm Overrides ──────────────────────────────────────────── */
+/* ---- XTerm Overrides ----------------------------------------------- */
 .xterm {
   padding: 12px;
 }
