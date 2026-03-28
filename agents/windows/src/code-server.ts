@@ -67,22 +67,11 @@ export function startCodeServer(
     launchTunnel();
   }
 
-  // If still starting, wait briefly for URL
+  // Tunnel is starting — tell the user to wait and retry
   if (tunnel.status === 'starting') {
-    // Give it a few seconds
-    const start = Date.now();
-    while (Date.now() - start < 10000) {
-      if (tunnel.url) {
-        const projectUrl = buildProjectUrl(tunnel.url, projectPath);
-        trackProject(projectPath, projectUrl);
-        return { url: projectUrl, networkUrl: projectUrl, port: 0, mode: 'tunnel' };
-      }
-      if (tunnel.status === 'needs-auth') {
-        throw new Error(tunnel.authMessage || 'Authentication required. Run "code tunnel" manually once to authenticate.');
-      }
-      // Busy wait (this is in a sync context)
-      execSync('timeout /t 1 /nobreak >nul 2>&1', { windowsHide: true, stdio: 'ignore' });
-    }
+    throw new Error(
+      'Tunnel is starting up. Tap "Start VS Code" again in a few seconds.'
+    );
   }
 
   if (tunnel.url) {
@@ -92,8 +81,7 @@ export function startCodeServer(
   }
 
   throw new Error(
-    'Tunnel is starting up. Try again in a few seconds. If this is your first time, ' +
-    'run "code tunnel" in a terminal on this machine to complete one-time authentication.'
+    'First-time setup: run "code tunnel" in a terminal on this machine to authenticate with GitHub. After that, it works automatically.'
   );
 }
 
