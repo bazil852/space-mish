@@ -3,13 +3,16 @@ import * as path from 'path';
 import * as os from 'os';
 import type { FileEntry } from '../../../packages/shared/src/types';
 
-/** Directories the agent is allowed to access. */
-function getApprovedDirs(): string[] {
+/**
+ * Directories the agent is allowed to access.
+ * Set AGENT_APPROVED_DIRS=* or leave unset to allow full filesystem access.
+ */
+function getApprovedDirs(): string[] | null {
   const envDirs = process.env.AGENT_APPROVED_DIRS;
-  if (envDirs) {
-    return envDirs.split(',').map((d) => d.trim());
+  if (!envDirs || envDirs.trim() === '*') {
+    return null; // unrestricted
   }
-  return [os.homedir(), 'C:\\Users'];
+  return envDirs.split(',').map((d) => d.trim());
 }
 
 /**
@@ -21,10 +24,13 @@ function normalizePath(p: string): string {
 
 /**
  * Check whether a given absolute path falls within one of the approved directories.
+ * Returns true for all paths when no restrictions are configured.
  */
 export function isPathApproved(targetPath: string): boolean {
+  const approved = getApprovedDirs();
+  if (approved === null) return true; // unrestricted mode
   const resolved = normalizePath(targetPath);
-  return getApprovedDirs().some((dir) => resolved.startsWith(normalizePath(dir)));
+  return approved.some((dir) => resolved.startsWith(normalizePath(dir)));
 }
 
 function assertPathApproved(targetPath: string): void {

@@ -65,10 +65,23 @@ export function getFileIcon(name: string, isDirectory: boolean): string {
   return iconMap[ext] || 'file';
 }
 
-const HUB_URL = process.env.NEXT_PUBLIC_HUB_URL || 'http://localhost:3001';
+function getHubUrl(): string {
+  if (process.env.NEXT_PUBLIC_HUB_URL) {
+    return process.env.NEXT_PUBLIC_HUB_URL;
+  }
+  if (typeof window !== 'undefined') {
+    // When behind a tunnel (HTTPS), hub is on the same origin
+    // When on LAN (HTTP), hub is on port 3001
+    if (window.location.protocol === 'https:') {
+      return window.location.origin;
+    }
+    return `http://${window.location.hostname}:3001`;
+  }
+  return 'http://localhost:3001';
+}
 
 export async function hubFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${HUB_URL}${path}`, {
+  const res = await fetch(`${getHubUrl()}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

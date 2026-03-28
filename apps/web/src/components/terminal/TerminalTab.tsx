@@ -84,8 +84,15 @@ export default function TerminalTab({ deviceId }: Props) {
 
       xtermRefs.current.set(sessionId, term);
 
-      // Connect to agent terminal WebSocket
-      const hubWs = process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:3001`;
+      // Connect to agent terminal WebSocket — auto-detect protocol for tunnel support
+      let hubWs: string;
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        hubWs = process.env.NEXT_PUBLIC_WS_URL;
+      } else if (window.location.protocol === 'https:') {
+        hubWs = `wss://${window.location.hostname}`;
+      } else {
+        hubWs = `ws://${window.location.hostname}:3001`;
+      }
       const ws = new WebSocket(`${hubWs}/terminal/${deviceId}/${sessionId}`);
 
       ws.onopen = () => {

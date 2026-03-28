@@ -11,9 +11,20 @@ class SpaceMishSocket {
   private url: string;
 
   constructor() {
-    this.url = typeof window !== 'undefined'
-      ? (process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:3001`)
-      : 'ws://localhost:3001';
+    if (typeof window !== 'undefined') {
+      // If explicit WS URL is set, use it
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        this.url = process.env.NEXT_PUBLIC_WS_URL;
+      } else {
+        // Auto-detect: use wss:// on HTTPS (tunnel), ws:// on HTTP (LAN)
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        const port = window.location.protocol === 'https:' ? '' : ':3001';
+        this.url = `${proto}//${host}${port}/ws`;
+      }
+    } else {
+      this.url = 'ws://localhost:3001/ws';
+    }
   }
 
   connect() {
