@@ -2,316 +2,383 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Code2, Terminal, FolderOpen, Play, Plus, ExternalLink, Edit3,
-  Trash2, GitBranch, Settings,
+  Code2, Terminal, FolderOpen, Play, ExternalLink, GitBranch,
+  RefreshCw, Square, Loader2, Search, Server,
 } from 'lucide-react';
-import { hubFetch, cn } from '@/lib/utils';
+import { hubFetch, cn, formatRelativeTime } from '@/lib/utils';
 
 interface Props {
   deviceId: string;
 }
 
-interface Project {
+interface DiscoveredProject {
   id: string;
-  deviceId: string;
   name: string;
   path: string;
-  repoUrl?: string;
-  codeServerEnabled: boolean;
-  codeServerPort?: number;
-  startupCommand?: string;
-  icon?: string;
-  sortOrder: number;
+  type: string;
+  markers: string[];
+  hasGit: boolean;
+  lastModified: string;
 }
 
+interface CodeSession {
+  port: number;
+  projectPath: string;
+  url: string;
+  startedAt: string;
+}
+
+const TYPE_ICONS: Record<string, string> = {
+  node: '📦', rust: '🦀', go: '🐹', python: '🐍',
+  java: '☕', dotnet: '🔷', cpp: '⚙️', generic: '📁',
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  node: 'text-green-400', rust: 'text-orange-400', go: 'text-cyan-400',
+  python: 'text-yellow-400', java: 'text-red-400', dotnet: 'text-purple-400',
+  cpp: 'text-blue-400', generic: 'text-space-mist/50',
+};
+
 export default function ProjectsTab({ deviceId }: Props) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<DiscoveredProject[]>([]);
+  const [sessions, setSessions] = useState<CodeSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  const [codeServerInstalled, setCodeServerInstalled] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchProjects();
+    fetchSessions();
   }, [deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchProjects() {
     setLoading(true);
     try {
-      const res = await hubFetch<{ ok: boolean; data: Project[] }>(`/api/projects?deviceId=${deviceId}`);
+      const res = await hubFetch<{ ok: boolean; data: DiscoveredProject[] }>(
+        `/api/files/browse/${deviceId}?special=projects`
+      );
       if (res.ok && res.data) {
         setProjects(res.data);
+        setLoading(false);
+        return;
       }
-    } catch {
-      setProjects(getDemoProjects(deviceId));
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
+
+    // Try direct agent projects endpoint via hub proxy
+    try {
+      const res = await hubFetch<{ ok: boolean; data: DiscoveredProject[] }>(
+        `/api/projects?deviceId=${deviceId}`
+      );
+      if (res.ok && res.data) {
+        setProjects(res.data);
+        setLoading(false);
+        return;
+      }
+    } catch {}
+
+    // Direct to agent as fallback
+    try {
+      const agentUrl = `http://${window.location.hostname}:3002`;
+      const res = await fetch(`${agentUrl}/projects?deep=true`);
+      const data = await res.json();
+      if (data.ok && data.data) {
+        setProjects(data.data);
+      }
+    } catch {}
+    setLoading(false);
   }
 
-  async function openCode(project: Project) {
+  async function fetchSessions() {
     try {
-      const res = await hubFetch<{ ok: boolean; data: { url: string } }>(`/api/projects/${project.id}/open-code`, {
+      const agentUrl = `http://${window.location.hostname}:3002`;
+      const res = await fetch(`${agentUrl}/projects/sessions`);
+      const data = await res.json();
+      if (data.ok && data.data) {
+        setSessions(data.data);
+      }
+    } catch {}
+  }
+
+  async function openCode(project: DiscoveredProject) {
+    setLaunching(project.id);
+    try {
+      // Check if already running for this path
+      const existing = sessions.find(s => s.projectPath === project.path);
+      if (existing) {
+        window.open(existing.url, '_blank');
+        setLaunching(null);
+        return;
+      }
+
+      const agentUrl = `http://${window.location.hostname}:3002`;
+      const res = await fetch(`${agentUrl}/projects/open-code`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath: project.path }),
       });
-      if (res.ok && res.data?.url) {
-        window.open(res.data.url, '_blank');
+      const data = await res.json();
+      if (data.ok && data.data) {
+        // Wait a moment for code-server to start
+        await new Promise(r => setTimeout(r, 2000));
+        window.open(data.data.networkUrl || data.data.url, '_blank');
+        fetchSessions();
+      } else {
+        alert(data.error || 'Failed to start code-server');
       }
-    } catch {
-      // Show fallback
-      const port = project.codeServerPort || 8080;
-      const url = `http://${window.location.hostname}:${port}/?folder=${encodeURIComponent(project.path)}`;
-      window.open(url, '_blank');
+    } catch (err) {
+      alert('Could not connect to agent. Is it running?');
+    } finally {
+      setLaunching(null);
     }
   }
 
-  async function runStartup(project: Project) {
-    if (!project.startupCommand) return;
+  async function stopCode(port: number) {
     try {
-      await hubFetch(`/api/projects/${project.id}/run`, { method: 'POST' });
-    } catch {
-      // Agent offline
-    }
+      const agentUrl = `http://${window.location.hostname}:3002`;
+      await fetch(`${agentUrl}/projects/stop-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port }),
+      });
+      fetchSessions();
+    } catch {}
   }
 
-  async function deleteProject(id: string) {
-    if (!confirm('Delete this project?')) return;
-    try {
-      await hubFetch(`/api/projects/${id}`, { method: 'DELETE' });
-      setProjects(prev => prev.filter(p => p.id !== id));
-    } catch {
-      // Failed
-    }
-  }
+  const filtered = filter
+    ? projects.filter(p =>
+        p.name.toLowerCase().includes(filter.toLowerCase()) ||
+        p.type.toLowerCase().includes(filter.toLowerCase())
+      )
+    : projects;
+
+  const runningPaths = new Set(sessions.map(s => s.projectPath));
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-start justify-between mb-5">
         <div>
           <h4 className="font-display font-semibold text-space-white text-lg">Projects</h4>
-          <p className="text-xs text-space-mist/40 mt-0.5">{projects.length} project{projects.length !== 1 ? 's' : ''} configured</p>
+          <p className="text-xs text-space-mist/40 mt-0.5">
+            Auto-discovered from your Documents folder — {projects.length} found
+          </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="cosmic-button-primary flex items-center gap-2 text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Add Project
-        </button>
+        <div className="flex items-center gap-2">
+          {sessions.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-surface text-xs font-mono">
+              <Server className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400">{sessions.length}</span>
+              <span className="text-space-mist/40">running</span>
+            </div>
+          )}
+          <button
+            onClick={() => { fetchProjects(); fetchSessions(); }}
+            className="cosmic-button flex items-center gap-2 text-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Rescan
+          </button>
+        </div>
       </div>
 
-      {/* Add form */}
-      {showAddForm && <AddProjectForm deviceId={deviceId} onClose={() => setShowAddForm(false)} onCreated={fetchProjects} />}
+      {/* Running sessions */}
+      {sessions.length > 0 && (
+        <div className="mb-6">
+          <h5 className="text-xs font-display font-semibold text-space-mist/40 uppercase tracking-widest mb-3">
+            Active Code Sessions
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {sessions.map(session => (
+              <div key={session.port} className="glass-card p-4 flex items-center gap-3 glow-border">
+                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400">
+                  <Code2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-space-white truncate">
+                    {session.projectPath.split(/[/\\]/).pop()}
+                  </p>
+                  <p className="text-[10px] font-mono text-space-mist/30 truncate">
+                    Port {session.port} · {formatRelativeTime(session.startedAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={session.url}
+                    target="_blank"
+                    rel="noopener"
+                    className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3"
+                  >
+                    <Code2 className="w-3 h-3" />
+                    Open
+                    <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                  </a>
+                  <button
+                    onClick={() => stopCode(session.port)}
+                    className="p-1.5 rounded-lg bg-red-500/10 text-red-400/70 hover:bg-red-500/20 transition-all"
+                    title="Stop session"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-space-mist/30" />
+          <input
+            type="text"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Filter projects..."
+            className="cosmic-input pl-10"
+          />
+        </div>
+      </div>
 
       {/* Projects grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[0, 1, 2].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => (
             <div key={i} className="glass-card p-5 animate-pulse">
-              <div className="w-32 h-5 rounded bg-space-navy/50 mb-3" />
-              <div className="w-48 h-3 rounded bg-space-navy/30 mb-4" />
-              <div className="flex gap-2">
-                <div className="w-20 h-8 rounded-lg bg-space-navy/30" />
-                <div className="w-20 h-8 rounded-lg bg-space-navy/30" />
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-space-navy/50" />
+                <div className="w-32 h-4 rounded bg-space-navy/50" />
               </div>
+              <div className="w-48 h-3 rounded bg-space-navy/30" />
             </div>
           ))}
         </div>
-      ) : projects.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="glass-card p-10 flex flex-col items-center text-center">
           <Code2 className="w-12 h-12 text-space-mist/15 mb-4" />
-          <h4 className="font-display font-medium text-space-mist/40 mb-1">No projects yet</h4>
-          <p className="text-sm text-space-mist/25 mb-5">Add a project to quickly launch code workspaces</p>
-          <button onClick={() => setShowAddForm(true)} className="cosmic-button flex items-center gap-2 text-sm">
-            <Plus className="w-4 h-4" />
-            Create Project
-          </button>
+          <h4 className="font-display font-medium text-space-mist/40 mb-1">
+            {filter ? 'No matching projects' : 'No projects found'}
+          </h4>
+          <p className="text-sm text-space-mist/25 mb-4 max-w-sm">
+            {filter
+              ? 'Try a different search term'
+              : 'No projects detected in your Documents folder. Set AGENT_PROJECT_DIRS in .env to scan other directories.'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((project, i) => (
-            <div
-              key={project.id}
-              className="glass-card p-5 group opacity-0 animate-slide-up"
-              style={{ animationDelay: `${i * 0.06}s` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">{project.icon || '📁'}</div>
-                  <div>
-                    <h5 className="font-display font-semibold text-space-white">{project.name}</h5>
-                    <p className="text-xs font-mono text-space-mist/40 mt-0.5 truncate max-w-[200px]">{project.path}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filtered.map((project, i) => {
+            const isRunning = runningPaths.has(project.path);
+            const isLaunching = launching === project.id;
+            const session = sessions.find(s => s.projectPath === project.path);
+
+            return (
+              <div
+                key={project.id}
+                className={cn(
+                  'glass-card p-5 group opacity-0 animate-slide-up',
+                  isRunning && 'border-emerald-500/20',
+                )}
+                style={{ animationDelay: `${Math.min(i, 12) * 0.04}s` }}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-2.5">
+                  <span className="text-xl">{TYPE_ICONS[project.type] || '📁'}</span>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-display font-semibold text-space-white text-sm truncate">
+                      {project.name}
+                    </h5>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={cn('text-[10px] font-mono uppercase', TYPE_COLORS[project.type] || 'text-space-mist/30')}>
+                        {project.type}
+                      </span>
+                      {project.hasGit && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-space-mist/30">
+                          <GitBranch className="w-2.5 h-2.5" />
+                          git
+                        </span>
+                      )}
+                      {isRunning && (
+                        <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          running
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 rounded-lg hover:bg-space-navy/50 text-space-mist/30 hover:text-space-mist transition-all">
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => deleteProject(project.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-500/15 text-space-mist/30 hover:text-red-400 transition-all"
+
+                {/* Path */}
+                <p className="text-[10px] font-mono text-space-mist/25 truncate mb-3" title={project.path}>
+                  {project.path}
+                </p>
+
+                {/* Modified time */}
+                <p className="text-[10px] text-space-mist/20 mb-3">
+                  Modified {formatRelativeTime(project.lastModified)}
+                </p>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isRunning && session ? (
+                    <a
+                      href={session.url}
+                      target="_blank"
+                      rel="noopener"
+                      className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3"
+                    >
+                      <Code2 className="w-3 h-3" />
+                      Open Editor
+                      <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => openCode(project)}
+                      disabled={isLaunching}
+                      className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3 disabled:opacity-50"
+                    >
+                      {isLaunching ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Code2 className="w-3 h-3" />
+                      )}
+                      {isLaunching ? 'Starting...' : 'Open in VS Code'}
+                    </button>
+                  )}
+                  <a
+                    href={`/devices/${deviceId}?tab=terminal`}
+                    className="cosmic-button flex items-center gap-1.5 text-[11px] py-1.5 px-3"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    <Terminal className="w-3 h-3" />
+                    Shell
+                  </a>
+                  <a
+                    href={`/devices/${deviceId}?tab=files`}
+                    className="cosmic-button flex items-center gap-1.5 text-[11px] py-1.5 px-3"
+                  >
+                    <FolderOpen className="w-3 h-3" />
+                    Files
+                  </a>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Meta info */}
-              <div className="flex items-center gap-3 mb-4 text-[11px] text-space-mist/30">
-                {project.repoUrl && (
-                  <span className="flex items-center gap-1">
-                    <GitBranch className="w-3 h-3" />
-                    git
-                  </span>
-                )}
-                {project.codeServerEnabled && (
-                  <span className="flex items-center gap-1 text-space-cyan/50">
-                    <Code2 className="w-3 h-3" />
-                    code-server
-                  </span>
-                )}
-                {project.startupCommand && (
-                  <span className="flex items-center gap-1">
-                    <Settings className="w-3 h-3" />
-                    startup cmd
-                  </span>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {project.codeServerEnabled && (
-                  <button
-                    onClick={() => openCode(project)}
-                    className="cosmic-button-primary flex items-center gap-2 text-xs py-2"
-                  >
-                    <Code2 className="w-3.5 h-3.5" />
-                    Open Code
-                    <ExternalLink className="w-3 h-3 opacity-50" />
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    window.location.href = `/devices/${project.deviceId}?tab=terminal`;
-                  }}
-                  className="cosmic-button flex items-center gap-2 text-xs py-2"
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                  Terminal
-                </button>
-                <button className="cosmic-button flex items-center gap-2 text-xs py-2">
-                  <FolderOpen className="w-3.5 h-3.5" />
-                  Files
-                </button>
-                {project.startupCommand && (
-                  <button
-                    onClick={() => runStartup(project)}
-                    className="cosmic-button flex items-center gap-2 text-xs py-2"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    Run
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+      {/* code-server install hint */}
+      {!loading && projects.length > 0 && codeServerInstalled === false && (
+        <div className="mt-6 glass-surface p-4 rounded-xl">
+          <p className="text-sm text-amber-400/70 mb-2 font-medium">code-server not detected</p>
+          <p className="text-xs text-space-mist/40 mb-2">
+            Install code-server to open VS Code in your browser:
+          </p>
+          <code className="text-xs font-mono text-space-accent/70 bg-space-void/40 px-2 py-1 rounded">
+            npm install -g code-server
+          </code>
         </div>
       )}
     </div>
   );
-}
-
-function AddProjectForm({
-  deviceId,
-  onClose,
-  onCreated,
-}: {
-  deviceId: string;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [path, setPath] = useState('');
-  const [startupCmd, setStartupCmd] = useState('');
-  const [codeServer, setCodeServer] = useState(true);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await hubFetch('/api/projects', {
-        method: 'POST',
-        body: JSON.stringify({
-          deviceId,
-          name,
-          path,
-          startupCommand: startupCmd || undefined,
-          codeServerEnabled: codeServer,
-          codeServerPort: 8080,
-          sortOrder: 0,
-        }),
-      });
-      onCreated();
-      onClose();
-    } catch {
-      // Failed
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="glass-card p-5 mb-5 space-y-4">
-      <h5 className="font-display font-semibold text-space-white">New Project</h5>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs text-space-mist/40 mb-1.5">Name</label>
-          <input value={name} onChange={e => setName(e.target.value)} required className="cosmic-input" placeholder="My Project" />
-        </div>
-        <div>
-          <label className="block text-xs text-space-mist/40 mb-1.5">Path</label>
-          <input value={path} onChange={e => setPath(e.target.value)} required className="cosmic-input font-mono" placeholder="/path/to/project" />
-        </div>
-        <div>
-          <label className="block text-xs text-space-mist/40 mb-1.5">Startup Command</label>
-          <input value={startupCmd} onChange={e => setStartupCmd(e.target.value)} className="cosmic-input font-mono" placeholder="npm run dev" />
-        </div>
-        <div className="flex items-end gap-3 pb-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={codeServer} onChange={e => setCodeServer(e.target.checked)}
-                   className="w-4 h-4 rounded border-space-border bg-space-void text-space-accent focus:ring-space-accent/30" />
-            <span className="text-sm text-space-mist/60">Enable code-server</span>
-          </label>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 pt-2">
-        <button type="submit" className="cosmic-button-primary text-sm">Create Project</button>
-        <button type="button" onClick={onClose} className="cosmic-button text-sm">Cancel</button>
-      </div>
-    </form>
-  );
-}
-
-function getDemoProjects(deviceId: string): Project[] {
-  return [
-    {
-      id: 'proj-1',
-      deviceId,
-      name: 'Space Mish',
-      path: deviceId.includes('win') ? 'D:\\Projects\\space-mish' : '~/Projects/space-mish',
-      repoUrl: 'https://github.com/user/space-mish',
-      codeServerEnabled: true,
-      codeServerPort: 8080,
-      startupCommand: 'npm run dev',
-      icon: '🛰️',
-      sortOrder: 0,
-    },
-    {
-      id: 'proj-2',
-      deviceId,
-      name: 'API Server',
-      path: deviceId.includes('win') ? 'D:\\Projects\\api-server' : '~/Projects/api-server',
-      codeServerEnabled: true,
-      codeServerPort: 8081,
-      startupCommand: 'cargo run',
-      icon: '⚡',
-      sortOrder: 1,
-    },
-  ];
 }

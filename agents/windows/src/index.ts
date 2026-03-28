@@ -29,11 +29,9 @@ import {
 } from './terminal';
 import { advertiseAgent, stopAdvertising } from './discovery';
 import {
-  getProjects,
-  getProject,
-  createProject,
-  updateProject,
-  deleteProject,
+  discoverProjects,
+  discoverProjectsDeep,
+  type DiscoveredProject,
 } from './projects';
 import {
   isInstalled as isCodeServerInstalled,
@@ -258,52 +256,62 @@ app.delete('/terminal/:sessionId', (req, res) => {
 });
 
 // ─── Project Routes ──────────────────────────────────────────────
-app.get('/projects', (_req, res) => {
-  res.json(ok(getProjects()));
+// Auto-discover projects from configured directories
+app.get('/projects', (req, res) => {
+  const deep = req.query.deep === 'true';
+  const projects = deep ? discoverProjectsDeep() : discoverProjects();
+  res.json(ok(projects));
 });
 
-app.post('/projects', (req, res) => {
-  try {
-    const project = createProject(req.body);
-    res.status(201).json(ok(project));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(400).json(fail(message, 400));
-  }
+// Get running code-server instances
+app.get('/projects/sessions', (_req, res) => {
+  res.json(ok(getRunningInstances()));
 });
 
-app.put('/projects/:id', (req, res) => {
-  const updated = updateProject(req.params.id, req.body);
-  if (updated) {
-    res.json(ok(updated));
-  } else {
-    res.status(404).json(fail('Project not found', 404));
-  }
-});
-
-app.delete('/projects/:id', (req, res) => {
-  const deleted = deleteProject(req.params.id);
-  if (deleted) {
-    res.json(ok({ deleted: req.params.id }));
-  } else {
-    res.status(404).json(fail('Project not found', 404));
-  }
-});
-
+// Launch code-server for a project path
 app.post('/projects/open-code', (req, res) => {
   try {
     const { projectPath, port } = req.body;
-    if (!projectPath || !port) {
-      res.status(400).json(fail('Missing projectPath or port', 400));
+    if (!projectPath) {
+      res.status(400).json(fail('Missing projectPath', 400));
       return;
     }
-    const result = startCodeServer(projectPath, port);
-    res.json(ok(result));
+
+    // Auto-assign port if not specified (base 8080, increment per instance)
+    const assignedPort = port || (8080 + getRunningInstances().length);
+    const result = startCodeServer(expandHome(projectPath), assignedPort);
+
+    // Return the URL that's accessible from the network (not localhost)
+    const networkUrl = `http://${getLocalIp()}:${assignedPort}`;
+    res.json(ok({ ...result, url: networkUrl, networkUrl }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json(fail(message));
   }
 });
+
+// Stop a code-server instance
+app.post('/projects/stop-code', (req, res) => {
+  const { port } = req.body;
+  if (!port) {
+    res.status(400).json(fail('Missing port', 400));
+    return;
+  }
+  const stopped = stopCodeServer(port);
+  res.json(ok({ stopped }));
+});
+
+function getLocalIp(): string {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '0.0.0.0';
+}
 
 // ─── Command Route ───────────────────────────────────────────────
 app.post('/commands/run', (req, res) => {
