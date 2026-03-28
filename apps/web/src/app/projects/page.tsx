@@ -48,10 +48,10 @@ export default function AllProjectsPage() {
         for (const d of devices) {
           grouped.set(d.id, [
             {
-              id: `demo-${d.id}-1`, deviceId: d.id, name: 'Space Mish',
-              path: d.os === 'windows' ? 'D:\\Projects\\space-mish' : '~/Projects/space-mish',
+              id: `demo-${d.id}-1`, deviceId: d.id, name: 'BazilBot Universe',
+              path: d.os === 'windows' ? 'D:\\Projects\\bazilbot' : '~/Projects/bazilbot',
               codeServerEnabled: true, codeServerPort: 8080, startupCommand: 'npm run dev',
-              icon: '🛰️', sortOrder: 0,
+              icon: '🤖', sortOrder: 0,
             },
             {
               id: `demo-${d.id}-2`, deviceId: d.id, name: 'API Server',
@@ -78,10 +78,10 @@ export default function AllProjectsPage() {
       <Topbar />
       <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
         <div className="mb-8 opacity-0 animate-slide-up">
-          <h2 className="font-display font-bold text-2xl sm:text-3xl text-space-white tracking-tight">
+          <h2 className="font-display font-bold text-2xl sm:text-3xl tracking-tight" style={{ color: '#1a1a1a' }}>
             All Projects
           </h2>
-          <p className="text-sm text-space-mist/50 mt-1">
+          <p className="text-sm mt-1" style={{ color: '#a3a3a3' }}>
             Projects across all your devices
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function AllProjectsPage() {
           <div className="space-y-8">
             {[0, 1].map(i => (
               <div key={i} className="animate-pulse">
-                <div className="w-40 h-5 rounded bg-space-navy/50 mb-4" />
+                <div className="w-40 h-5 rounded mb-4" style={{ background: '#ebebeb' }} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="glass-card p-5 h-32" />
                   <div className="glass-card p-5 h-32" />
@@ -106,14 +106,14 @@ export default function AllProjectsPage() {
                 <div key={deviceId} className="opacity-0 animate-slide-up" style={{ animationDelay: `${groupIdx * 0.1}s` }}>
                   {/* Device header */}
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 rounded-lg bg-space-accent/10 text-space-accent">
+                    <div className="p-2 rounded-lg" style={{ background: '#f0f0f0', color: '#1a1a1a' }}>
                       {osIcons[device?.os || 'linux']}
                     </div>
                     <div>
-                      <h3 className="font-display font-semibold text-space-white">
+                      <h3 className="font-display font-semibold" style={{ color: '#1a1a1a' }}>
                         {device?.name || deviceId}
                       </h3>
-                      <p className="text-[10px] font-mono text-space-mist/30">
+                      <p className="text-[10px] font-mono" style={{ color: '#c4c4c4' }}>
                         {device?.localIp} · {projects.length} project{projects.length !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -134,8 +134,8 @@ export default function AllProjectsPage() {
                         <div className="flex items-center gap-3 mb-3">
                           <span className="text-xl">{project.icon || '📁'}</span>
                           <div>
-                            <h5 className="font-display font-semibold text-space-white text-sm">{project.name}</h5>
-                            <p className="text-[10px] font-mono text-space-mist/30 truncate max-w-[180px]">{project.path}</p>
+                            <h5 className="font-display font-semibold text-sm" style={{ color: '#1a1a1a' }}>{project.name}</h5>
+                            <p className="text-[10px] font-mono truncate max-w-[180px]" style={{ color: '#c4c4c4' }}>{project.path}</p>
                           </div>
                         </div>
 

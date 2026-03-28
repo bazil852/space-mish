@@ -144,30 +144,34 @@ export default function FilesTab({ deviceId }: Props) {
   return (
     <div className="glass-card overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-space-border">
+      <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: '1px solid #ebebeb' }}>
         <button
           onClick={goBack}
           disabled={pathHistory.length === 0}
-          className="p-2 rounded-lg hover:bg-space-navy/40 text-space-mist/50 hover:text-space-white
-                     disabled:opacity-20 transition-all"
+          className="p-2 rounded-lg transition-all disabled:opacity-20"
+          style={{ color: '#888888' }}
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <button onClick={goHome} className="p-2 rounded-lg hover:bg-space-navy/40 text-space-mist/50 hover:text-space-white transition-all">
+        <button
+          onClick={goHome}
+          className="p-2 rounded-lg transition-all"
+          style={{ color: '#888888' }}
+        >
           <Home className="w-4 h-4" />
         </button>
 
         {/* Breadcrumb path */}
-        <div className="flex-1 flex items-center gap-1 text-sm font-mono text-space-mist/40 overflow-x-auto">
+        <div className="flex-1 flex items-center gap-1 text-sm font-mono overflow-x-auto" style={{ color: '#a3a3a3' }}>
           {breadcrumbs.map((part, i) => (
             <span key={i} className="flex items-center gap-1 whitespace-nowrap">
-              {i > 0 && <ChevronRight className="w-3 h-3 text-space-mist/20" />}
+              {i > 0 && <ChevronRight className="w-3 h-3" style={{ color: '#d4d4d4' }} />}
               <button
                 onClick={() => {
                   const path = breadcrumbs.slice(0, i + 1).join('/');
                   navigateTo(path.startsWith('~') ? path : '/' + path);
                 }}
-                className="hover:text-space-accent transition-colors"
+                className="hover:text-neutral-900 transition-colors"
               >
                 {part}
               </button>
@@ -191,21 +195,21 @@ export default function FilesTab({ deviceId }: Props) {
           <div className="p-5 space-y-2">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
-                <div className="w-10 h-10 rounded-lg bg-space-navy/50" />
+                <div className="w-10 h-10 rounded-lg" style={{ background: '#f0f0f0' }} />
                 <div className="flex-1">
-                  <div className="w-40 h-4 rounded bg-space-navy/50 mb-1.5" />
-                  <div className="w-24 h-3 rounded bg-space-navy/30" />
+                  <div className="w-40 h-4 rounded mb-1.5" style={{ background: '#ebebeb' }} />
+                  <div className="w-24 h-3 rounded" style={{ background: '#f5f5f5' }} />
                 </div>
               </div>
             ))}
           </div>
         ) : files.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-space-mist/30">
+          <div className="flex flex-col items-center justify-center py-16" style={{ color: '#c4c4c4' }}>
             <Folder className="w-12 h-12 mb-3 opacity-30" />
             <p className="text-sm">Empty directory</p>
           </div>
         ) : (
-          <div className="divide-y divide-space-border/30">
+          <div>
             {files
               .sort((a, b) => {
                 if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
@@ -217,28 +221,30 @@ export default function FilesTab({ deviceId }: Props) {
                   className={cn(
                     'flex items-center gap-3.5 px-5 py-3 transition-all duration-150 group',
                     file.isDirectory
-                      ? 'cursor-pointer hover:bg-space-accent/5'
-                      : 'hover:bg-space-navy/20',
+                      ? 'cursor-pointer hover:bg-neutral-50'
+                      : 'hover:bg-neutral-50',
                   )}
+                  style={{ borderBottom: '1px solid #f5f5f5' }}
                   onClick={() => file.isDirectory && navigateTo(file.path)}
                 >
-                  <div className={cn(
-                    'p-2.5 rounded-lg flex-shrink-0',
-                    file.isDirectory
-                      ? 'bg-space-accent/10 text-space-accent'
-                      : 'bg-space-navy/40 text-space-mist/50',
-                  )}>
+                  <div
+                    className="p-2.5 rounded-lg flex-shrink-0"
+                    style={{
+                      background: file.isDirectory ? '#f0f0f0' : '#f7f7f7',
+                      color: file.isDirectory ? '#1a1a1a' : '#a3a3a3',
+                    }}
+                  >
                     {getIcon(file.name, file.isDirectory)}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      'text-sm font-medium truncate',
-                      file.isDirectory ? 'text-space-white' : 'text-space-mist/80',
-                    )}>
+                    <p
+                      className="text-sm font-medium truncate"
+                      style={{ color: file.isDirectory ? '#1a1a1a' : '#555555' }}
+                    >
                       {file.name}
                     </p>
-                    <p className="text-[11px] text-space-mist/30 font-mono mt-0.5">
+                    <p className="text-[11px] font-mono mt-0.5" style={{ color: '#c4c4c4' }}>
                       {file.isDirectory ? 'Directory' : formatBytes(file.size)}
                       {' · '}
                       {formatRelativeTime(file.modifiedAt)}
@@ -250,14 +256,16 @@ export default function FilesTab({ deviceId }: Props) {
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDownload(file.path, file.name); }}
-                        className="p-2 rounded-lg hover:bg-space-accent/15 text-space-mist/40 hover:text-space-accent transition-all"
+                        className="p-2 rounded-lg transition-all"
+                        style={{ color: '#a3a3a3' }}
                         title="Download"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(file.path); }}
-                        className="p-2 rounded-lg hover:bg-red-500/15 text-space-mist/40 hover:text-red-400 transition-all"
+                        className="p-2 rounded-lg transition-all"
+                        style={{ color: '#ef4444' }}
                         title="Delete"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -266,8 +274,10 @@ export default function FilesTab({ deviceId }: Props) {
                   )}
 
                   {file.isDirectory && (
-                    <ChevronRight className="w-4 h-4 text-space-mist/20 group-hover:text-space-accent/50
-                                            transform group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight
+                      className="w-4 h-4 transform group-hover:translate-x-0.5 transition-all"
+                      style={{ color: '#d4d4d4' }}
+                    />
                   )}
                 </div>
               ))}

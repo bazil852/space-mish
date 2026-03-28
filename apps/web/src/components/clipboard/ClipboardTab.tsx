@@ -74,8 +74,8 @@ export default function ClipboardTab({ deviceId }: Props) {
       {/* Read clipboard */}
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-5">
-          <h4 className="font-display font-semibold text-space-white flex items-center gap-2">
-            <Copy className="w-4 h-4 text-space-accent" />
+          <h4 className="font-display font-semibold flex items-center gap-2" style={{ color: '#1a1a1a' }}>
+            <Copy className="w-4 h-4" style={{ color: '#888888' }} />
             Read Clipboard
           </h4>
           <button
@@ -91,20 +91,21 @@ export default function ClipboardTab({ deviceId }: Props) {
         <div className="glass-surface p-4 min-h-[120px] rounded-xl">
           {clipboardText ? (
             <div className="relative group">
-              <pre className="text-sm font-mono text-space-white/80 whitespace-pre-wrap break-words">
+              <pre className="text-sm font-mono whitespace-pre-wrap break-words" style={{ color: '#1a1a1a' }}>
                 {clipboardText}
               </pre>
               <button
                 onClick={() => copyToLocal(clipboardText)}
-                className="absolute top-0 right-0 p-2 rounded-lg bg-space-navy/60 text-space-mist/50
-                           opacity-0 group-hover:opacity-100 hover:text-space-accent transition-all"
+                className="absolute top-0 right-0 p-2 rounded-lg
+                           opacity-0 group-hover:opacity-100 transition-all"
+                style={{ background: '#ebebeb', color: '#888888' }}
                 title="Copy to local clipboard"
               >
                 <ArrowDownToLine className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <p className="text-sm text-space-mist/30 italic">
+            <p className="text-sm italic" style={{ color: '#a3a3a3' }}>
               Click &ldquo;Fetch&rdquo; to read the device clipboard
             </p>
           )}
@@ -113,8 +114,8 @@ export default function ClipboardTab({ deviceId }: Props) {
 
       {/* Write clipboard */}
       <div className="glass-card p-6">
-        <h4 className="font-display font-semibold text-space-white flex items-center gap-2 mb-5">
-          <ClipboardPaste className="w-4 h-4 text-space-cyan" />
+        <h4 className="font-display font-semibold flex items-center gap-2 mb-5" style={{ color: '#1a1a1a' }}>
+          <ClipboardPaste className="w-4 h-4" style={{ color: '#888888' }} />
           Write Clipboard
         </h4>
 
@@ -150,8 +151,8 @@ export default function ClipboardTab({ deviceId }: Props) {
       {/* History */}
       <div className="glass-card p-6 lg:col-span-2">
         <div className="flex items-center justify-between mb-5">
-          <h4 className="font-display font-semibold text-space-white flex items-center gap-2">
-            <Clock className="w-4 h-4 text-space-mist/50" />
+          <h4 className="font-display font-semibold flex items-center gap-2" style={{ color: '#1a1a1a' }}>
+            <Clock className="w-4 h-4" style={{ color: '#888888' }} />
             Clipboard History
           </h4>
           <button onClick={loadHistory} className="cosmic-button text-xs">
@@ -160,7 +161,7 @@ export default function ClipboardTab({ deviceId }: Props) {
         </div>
 
         {history.length === 0 ? (
-          <p className="text-sm text-space-mist/30 italic">No history yet</p>
+          <p className="text-sm italic" style={{ color: '#a3a3a3' }}>No history yet</p>
         ) : (
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {history.map(entry => (
@@ -169,21 +170,23 @@ export default function ClipboardTab({ deviceId }: Props) {
                 className="flex items-start gap-3 p-3 rounded-xl glass-surface group cursor-pointer"
                 onClick={() => copyToLocal(entry.textPreview)}
               >
-                <div className={`p-1.5 rounded-lg mt-0.5 ${
-                  entry.direction === 'read'
-                    ? 'bg-space-accent/10 text-space-accent'
-                    : 'bg-space-cyan/10 text-space-cyan'
-                }`}>
+                <div
+                  className="p-1.5 rounded-lg mt-0.5"
+                  style={{
+                    background: entry.direction === 'read' ? '#f0f0f0' : '#f0f0f0',
+                    color: entry.direction === 'read' ? '#1a1a1a' : '#888888',
+                  }}
+                >
                   {entry.direction === 'read'
                     ? <ArrowDownToLine className="w-3 h-3" />
                     : <ArrowUpFromLine className="w-3 h-3" />
                   }
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-space-white/70 truncate">{entry.textPreview}</p>
-                  <p className="text-[10px] text-space-mist/30 mt-0.5">{formatRelativeTime(entry.createdAt)}</p>
+                  <p className="text-xs font-mono truncate" style={{ color: '#1a1a1a' }}>{entry.textPreview}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#a3a3a3' }}>{formatRelativeTime(entry.createdAt)}</p>
                 </div>
-                <Copy className="w-3.5 h-3.5 text-space-mist/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Copy className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#c4c4c4' }} />
               </div>
             ))}
           </div>

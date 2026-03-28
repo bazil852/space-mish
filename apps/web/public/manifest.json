@@ -1,11 +1,11 @@
 {
-  "name": "Space Mish",
-  "short_name": "SpaceMish",
-  "description": "Device control hub — your iPad becomes the cockpit",
+  "name": "BazilBot Universe",
+  "short_name": "BazilBot",
+  "description": "A clean, premium dashboard to control all your devices from one place",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050816",
-  "theme_color": "#1e3a8a",
+  "background_color": "#f2f2f2",
+  "theme_color": "#1a1a1a",
   "orientation": "any",
   "icons": [
     {

@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Space Mish — Device Control Hub',
-  description: 'Your iPad becomes the cockpit. Control all your devices from one place.',
+  title: 'BazilBot Universe — Device Control Hub',
+  description: 'A clean, premium dashboard to control all your devices from one place.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Space Mish',
+    statusBarStyle: 'default',
+    title: 'BazilBot Universe',
   },
 };
 
@@ -17,19 +17,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#050816',
+  themeColor: '#f2f2f2',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="font-body antialiased">
-        {/* Cosmic background layers */}
-        <div className="starfield" />
-        <div className="cockpit-grid" />
-        <div className="nebula-glow nebula-glow-1" />
-        <div className="nebula-glow nebula-glow-2" />
-
+    <html lang="en">
+      <body className="font-body antialiased" style={{ backgroundColor: '#f2f2f2' }}>
         {/* App shell */}
         <div className="relative min-h-dvh flex flex-col">
           {children}

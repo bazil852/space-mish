@@ -84,7 +84,7 @@ export default function TerminalTab({ deviceId }: Props) {
 
       xtermRefs.current.set(sessionId, term);
 
-      // Connect to agent terminal WebSocket — auto-detect protocol for tunnel support
+      // Connect to agent terminal WebSocket -- auto-detect protocol for tunnel support
       let hubWs: string;
       if (process.env.NEXT_PUBLIC_WS_URL) {
         hubWs = process.env.NEXT_PUBLIC_WS_URL;
@@ -96,7 +96,7 @@ export default function TerminalTab({ deviceId }: Props) {
       const ws = new WebSocket(`${hubWs}/terminal/${deviceId}/${sessionId}`);
 
       ws.onopen = () => {
-        term.write('\r\n  \x1b[1;34m✦ Space Mish Terminal\x1b[0m\r\n  \x1b[90mConnected to device\x1b[0m\r\n\r\n');
+        term.write('\r\n  \x1b[1;34m+ BazilBot Terminal\x1b[0m\r\n  \x1b[90mConnected to device\x1b[0m\r\n\r\n');
       };
 
       ws.onmessage = (event) => {
@@ -108,11 +108,11 @@ export default function TerminalTab({ deviceId }: Props) {
       };
 
       ws.onerror = () => {
-        term.write('\r\n  \x1b[33m⚠ Could not connect to agent terminal.\x1b[0m\r\n');
-        term.write('  \x1b[90mMake sure the Space Mish agent is running on the target device.\x1b[0m\r\n\r\n');
+        term.write('\r\n  \x1b[33m! Could not connect to agent terminal.\x1b[0m\r\n');
+        term.write('  \x1b[90mMake sure the BazilBot agent is running on the target device.\x1b[0m\r\n\r\n');
         // Provide a local echo for demo
         let buffer = '';
-        term.write('\x1b[1;36m❯\x1b[0m ');
+        term.write('\x1b[1;36m>\x1b[0m ');
         term.onData((data: string) => {
           if (data === '\r') {
             term.write('\r\n');
@@ -121,7 +121,7 @@ export default function TerminalTab({ deviceId }: Props) {
               term.write(`\x1b[33mCommand would execute on ${deviceId}\x1b[0m\r\n`);
             }
             buffer = '';
-            term.write('\x1b[1;36m❯\x1b[0m ');
+            term.write('\x1b[1;36m>\x1b[0m ');
           } else if (data === '\x7f') {
             if (buffer.length > 0) {
               buffer = buffer.slice(0, -1);
@@ -190,27 +190,38 @@ export default function TerminalTab({ deviceId }: Props) {
 
   return (
     <div className={cn(
-      'glass-card overflow-hidden flex flex-col',
-      fullscreen && 'fixed inset-0 z-50 rounded-none',
-    )}>
+      'overflow-hidden flex flex-col',
+      fullscreen ? 'fixed inset-0 z-50 rounded-none' : '',
+    )}
+    style={{
+      background: '#ffffff',
+      border: fullscreen ? 'none' : '1px solid #e5e5e5',
+      borderRadius: fullscreen ? '0' : '20px',
+    }}
+    >
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-space-border bg-space-void/40">
+      <div
+        className="flex items-center gap-1 px-3 py-2"
+        style={{ borderBottom: '1px solid #ebebeb', background: '#ffffff' }}
+      >
         <div className="flex items-center gap-1 flex-1 overflow-x-auto">
           {sessions.map(session => (
             <div
               key={session.id}
               className={cn(
                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono cursor-pointer transition-all group',
-                activeSession === session.id
-                  ? 'bg-space-accent/15 text-space-accent border border-space-accent/20'
-                  : 'text-space-mist/40 hover:text-space-mist/70 hover:bg-space-navy/30 border border-transparent',
               )}
+              style={
+                activeSession === session.id
+                  ? { background: '#1a1a1a', color: '#ffffff' }
+                  : { color: '#a3a3a3' }
+              }
               onClick={() => setActiveSession(session.id)}
             >
               <span>{session.label}</span>
               <button
                 onClick={(e) => { e.stopPropagation(); closeSession(session.id); }}
-                className="p-0.5 rounded hover:bg-space-navy/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -220,14 +231,16 @@ export default function TerminalTab({ deviceId }: Props) {
 
         <button
           onClick={createSession}
-          className="p-1.5 rounded-lg hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent transition-all"
+          className="p-1.5 rounded-lg transition-all"
+          style={{ color: '#a3a3a3' }}
           title="New terminal"
         >
           <Plus className="w-4 h-4" />
         </button>
         <button
           onClick={() => setFullscreen(f => !f)}
-          className="p-1.5 rounded-lg hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent transition-all"
+          className="p-1.5 rounded-lg transition-all"
+          style={{ color: '#a3a3a3' }}
           title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
           {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -247,7 +260,7 @@ export default function TerminalTab({ deviceId }: Props) {
           />
         ))}
         {sessions.length === 0 && (
-          <div className="flex items-center justify-center h-full text-space-mist/30 text-sm">
+          <div className="flex items-center justify-center h-full text-sm" style={{ color: '#a3a3a3' }}>
             No terminal sessions
           </div>
         )}

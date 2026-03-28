@@ -42,16 +42,16 @@ export default function DeviceDetailPage() {
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
           <div className="animate-pulse space-y-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-space-navy/50" />
+              <div className="w-12 h-12 rounded-xl" style={{ background: '#f0f0f0' }} />
               <div>
-                <div className="w-48 h-6 rounded bg-space-navy/50 mb-2" />
-                <div className="w-32 h-4 rounded bg-space-navy/30" />
+                <div className="w-48 h-6 rounded mb-2" style={{ background: '#ebebeb' }} />
+                <div className="w-32 h-4 rounded" style={{ background: '#f5f5f5' }} />
               </div>
             </div>
             <div className="flex gap-2">
-              {[...Array(5)].map((_, i) => <div key={i} className="w-24 h-9 rounded-xl bg-space-navy/30" />)}
+              {[...Array(5)].map((_, i) => <div key={i} className="w-24 h-9 rounded-xl" style={{ background: '#f0f0f0' }} />)}
             </div>
-            <div className="w-full h-96 rounded-2xl bg-space-navy/20" />
+            <div className="w-full h-96 rounded-[20px]" style={{ background: '#f5f5f5' }} />
           </div>
         </main>
       </>
@@ -64,7 +64,7 @@ export default function DeviceDetailPage() {
         <Topbar />
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="font-display font-bold text-xl text-space-mist/40 mb-2">Device not found</h2>
+            <h2 className="font-display font-bold text-xl mb-2" style={{ color: '#a3a3a3' }}>Device not found</h2>
             <Link href="/" className="cosmic-button text-sm">Back to Dashboard</Link>
           </div>
         </main>
@@ -81,24 +81,24 @@ export default function DeviceDetailPage() {
         <div className="flex items-center gap-4 mb-6 opacity-0 animate-slide-up">
           <Link
             href="/"
-            className="p-2.5 rounded-xl glass-surface hover:border-space-accent/20 text-space-mist/40
-                       hover:text-space-accent transition-all"
+            className="p-2.5 rounded-xl transition-all"
+            style={{ background: '#ffffff', border: '1px solid #e5e5e5', color: '#888888' }}
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
 
-          <div className="p-3 rounded-xl bg-space-accent/10 text-space-accent">
+          <div className="p-3 rounded-xl" style={{ background: '#f0f0f0', color: '#1a1a1a' }}>
             {osIcons[device.os] || <Monitor className="w-5 h-5" />}
           </div>
 
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h2 className="font-display font-bold text-xl sm:text-2xl text-space-white">
+              <h2 className="font-display font-bold text-xl sm:text-2xl" style={{ color: '#1a1a1a' }}>
                 {device.name}
               </h2>
               <div className={device.online ? 'status-online' : 'status-offline'} />
             </div>
-            <p className="text-xs font-mono text-space-mist/40 mt-0.5">
+            <p className="text-xs font-mono mt-0.5" style={{ color: '#a3a3a3' }}>
               {device.localIp} · {device.hostname}
             </p>
           </div>

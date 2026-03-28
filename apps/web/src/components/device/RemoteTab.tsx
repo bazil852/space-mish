@@ -62,7 +62,7 @@ export default function RemoteTab({ deviceId }: Props) {
 
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
-        // Binary frame — render to canvas
+        // Binary frame -- render to canvas
         const blob = new Blob([event.data], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
         const img = new Image();
@@ -197,16 +197,26 @@ export default function RemoteTab({ deviceId }: Props) {
   return (
     <div className={cn(
       'flex flex-col',
-      fullscreen && 'fixed inset-0 z-50 bg-space-void',
-    )}>
+      fullscreen && 'fixed inset-0 z-50',
+    )}
+    style={fullscreen ? { background: '#f2f2f2' } : undefined}
+    >
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 glass-card-solid rounded-b-none mb-0">
+      <div
+        className="flex items-center justify-between px-4 py-3 mb-0"
+        style={{
+          background: '#ffffff',
+          border: '1px solid #e5e5e5',
+          borderBottom: '1px solid #ebebeb',
+          borderRadius: '20px 20px 0 0',
+        }}
+      >
         <div className="flex items-center gap-3">
-          <Monitor className="w-4 h-4 text-space-accent" />
-          <span className="text-sm font-display font-medium text-space-white">Remote View</span>
+          <Monitor className="w-4 h-4" style={{ color: '#1a1a1a' }} />
+          <span className="text-sm font-display font-medium" style={{ color: '#1a1a1a' }}>Remote View</span>
           {connected && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg glass-surface text-[10px] font-mono text-space-mist/40">
-              <Signal className="w-3 h-3 text-emerald-400" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg glass-surface text-[10px] font-mono" style={{ color: '#a3a3a3' }}>
+              <Signal className="w-3 h-3 text-emerald-500" />
               <span>{fps} fps</span>
             </div>
           )}
@@ -217,24 +227,24 @@ export default function RemoteTab({ deviceId }: Props) {
             <>
               <button
                 onClick={() => setInputEnabled(e => !e)}
-                className={cn(
-                  'p-1.5 rounded-lg transition-all',
+                className="p-1.5 rounded-lg transition-all"
+                style={
                   inputEnabled
-                    ? 'bg-space-accent/15 text-space-accent'
-                    : 'hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent',
-                )}
+                    ? { background: '#f0f0f0', color: '#1a1a1a' }
+                    : { color: '#a3a3a3' }
+                }
                 title="Mouse input"
               >
                 <MousePointer className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setKeyboardMode(k => !k)}
-                className={cn(
-                  'p-1.5 rounded-lg transition-all',
+                className="p-1.5 rounded-lg transition-all"
+                style={
                   keyboardMode
-                    ? 'bg-space-accent/15 text-space-accent'
-                    : 'hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent',
-                )}
+                    ? { background: '#f0f0f0', color: '#1a1a1a' }
+                    : { color: '#a3a3a3' }
+                }
                 title={keyboardMode ? 'Keyboard capture ON' : 'Keyboard capture OFF'}
               >
                 <Keyboard className="w-4 h-4" />
@@ -243,21 +253,24 @@ export default function RemoteTab({ deviceId }: Props) {
           )}
           <button
             onClick={() => setShowSettings(s => !s)}
-            className="p-1.5 rounded-lg hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent transition-all"
+            className="p-1.5 rounded-lg transition-all"
+            style={{ color: '#a3a3a3' }}
           >
             <Settings2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setFullscreen(f => !f)}
-            className="p-1.5 rounded-lg hover:bg-space-navy/40 text-space-mist/40 hover:text-space-accent transition-all"
+            className="p-1.5 rounded-lg transition-all"
+            style={{ color: '#a3a3a3' }}
           >
             {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
           {connected ? (
             <button
               onClick={stopSession}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 text-xs font-medium
-                         hover:bg-red-500/25 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium
+                         transition-all"
+              style={{ background: 'rgba(239,68,68,0.06)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.12)' }}
             >
               <Square className="w-3 h-3" />
               Stop
@@ -265,8 +278,7 @@ export default function RemoteTab({ deviceId }: Props) {
           ) : (
             <button
               onClick={startSession}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-space-accent/15 text-space-accent text-xs font-medium
-                         hover:bg-space-accent/25 transition-all"
+              className="cosmic-button-primary flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
             >
               <Play className="w-3 h-3" />
               Start
@@ -277,8 +289,11 @@ export default function RemoteTab({ deviceId }: Props) {
 
       {/* Quality settings */}
       {showSettings && (
-        <div className="px-4 py-3 glass-card rounded-none border-t-0 mb-0">
-          <h5 className="text-xs font-display font-semibold text-space-mist/40 uppercase tracking-widest mb-3">
+        <div
+          className="px-4 py-3 mb-0"
+          style={{ background: '#ffffff', borderLeft: '1px solid #e5e5e5', borderRight: '1px solid #e5e5e5' }}
+        >
+          <h5 className="text-xs font-display font-semibold uppercase tracking-widest mb-3" style={{ color: '#a3a3a3' }}>
             Quality Preset
           </h5>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -286,15 +301,15 @@ export default function RemoteTab({ deviceId }: Props) {
               <button
                 key={id}
                 onClick={() => setQuality(id)}
-                className={cn(
-                  'p-3 rounded-xl text-left transition-all',
+                className="p-3 rounded-xl text-left transition-all"
+                style={
                   quality === id
-                    ? 'bg-space-accent/15 border border-space-accent/25 text-space-white'
-                    : 'glass-surface text-space-mist/50 hover:text-space-mist/80',
-                )}
+                    ? { background: '#1a1a1a', color: '#ffffff', border: '1px solid #1a1a1a' }
+                    : { background: '#f7f7f7', color: '#888888', border: '1px solid #ebebeb' }
+                }
               >
                 <div className="text-sm font-medium">{cfg.label}</div>
-                <div className="text-[10px] text-space-mist/30 mt-0.5">Q{cfg.quality} / {cfg.fps}fps</div>
+                <div className="text-[10px] mt-0.5" style={{ opacity: 0.6 }}>Q{cfg.quality} / {cfg.fps}fps</div>
               </button>
             ))}
           </div>
@@ -304,8 +319,14 @@ export default function RemoteTab({ deviceId }: Props) {
       {/* Stream area */}
       <div
         ref={containerRef}
-        className="flex-1 glass-card rounded-t-none border-t-0 overflow-hidden relative"
-        style={{ minHeight: fullscreen ? '100%' : '500px' }}
+        className="flex-1 overflow-hidden relative"
+        style={{
+          minHeight: fullscreen ? '100%' : '500px',
+          background: '#ffffff',
+          border: '1px solid #e5e5e5',
+          borderTop: '0',
+          borderRadius: '0 0 20px 20px',
+        }}
       >
         {connected ? (
           <div className="w-full h-full flex items-center justify-center bg-black/50">
@@ -318,24 +339,27 @@ export default function RemoteTab({ deviceId }: Props) {
               onContextMenu={handleContextMenu}
             />
             {keyboardMode && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-space-accent/20
-                              text-space-accent text-xs font-mono animate-pulse-glow">
-                Keyboard capture active — press keys to type
+              <div
+                className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg
+                            text-xs font-mono animate-pulse"
+                style={{ background: 'rgba(26,26,26,0.9)', color: '#ffffff' }}
+              >
+                Keyboard capture active -- press keys to type
               </div>
             )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full py-16">
             <div className="relative mb-8">
-              <Monitor className="w-24 h-24 text-space-accent/10" />
+              <Monitor className="w-24 h-24" style={{ color: '#e5e5e5' }} />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Play className="w-8 h-8 text-space-accent/30" />
+                <Play className="w-8 h-8" style={{ color: '#c4c4c4' }} />
               </div>
             </div>
-            <h4 className="font-display font-semibold text-lg text-space-white mb-2">
+            <h4 className="font-display font-semibold text-lg mb-2" style={{ color: '#1a1a1a' }}>
               Remote Desktop
             </h4>
-            <p className="text-sm text-space-mist/40 text-center max-w-sm mb-6 leading-relaxed">
+            <p className="text-sm text-center max-w-sm mb-6 leading-relaxed" style={{ color: '#a3a3a3' }}>
               Stream the screen from this device. Click, type, and interact directly.
               Best performance on LAN.
             </p>
@@ -346,7 +370,7 @@ export default function RemoteTab({ deviceId }: Props) {
               <Play className="w-4 h-4" />
               Start Remote Session
             </button>
-            <p className="text-[10px] text-space-mist/20 mt-4 font-mono">
+            <p className="text-[10px] mt-4 font-mono" style={{ color: '#c4c4c4' }}>
               Windows: works out of the box | macOS: requires Screen Recording permission
             </p>
           </div>

@@ -154,33 +154,44 @@ export default function CommandPalette({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-space-void/70 backdrop-blur-md" />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0, 0, 0, 0.15)' }} />
 
       {/* Palette */}
       <div
-        className="relative w-full max-w-lg mx-4 glass-card-solid overflow-hidden animate-slide-up"
+        className="relative w-full max-w-lg mx-4 overflow-hidden animate-slide-up"
+        style={{
+          background: '#ffffff',
+          borderRadius: '20px',
+          border: '1px solid #e5e5e5',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12)',
+        }}
         onClick={e => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-space-border">
-          <Search className="w-5 h-5 text-space-accent/60 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: '1px solid #ebebeb' }}>
+          <Search className="w-5 h-5 flex-shrink-0" style={{ color: '#a3a3a3' }} />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Type a command or search..."
-            className="flex-1 bg-transparent text-space-white text-base font-body outline-none placeholder:text-space-mist/35"
+            className="flex-1 bg-transparent text-base font-body outline-none"
+            style={{ color: '#1a1a1a' }}
           />
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-space-navy/50 transition-colors">
-            <X className="w-4 h-4 text-space-mist/50" />
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg transition-colors"
+            style={{ color: '#a3a3a3' }}
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-[320px] overflow-y-auto p-2">
           {filtered.length === 0 && (
-            <div className="px-4 py-8 text-center text-space-mist/40 text-sm">
+            <div className="px-4 py-8 text-center text-sm" style={{ color: '#a3a3a3' }}>
               No commands found
             </div>
           )}
@@ -188,29 +199,37 @@ export default function CommandPalette({ onClose }: Props) {
             <button
               key={cmd.id}
               onClick={() => { cmd.action(); onClose(); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-left transition-all duration-150
-                ${i === selectedIndex
-                  ? 'bg-space-accent/15 border border-space-accent/20 text-space-white'
-                  : 'border border-transparent text-space-mist hover:bg-space-navy/40 hover:text-space-white'
-                }`}
+              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-left transition-all duration-150"
+              style={{
+                background: i === selectedIndex ? '#f5f5f5' : 'transparent',
+                border: i === selectedIndex ? '1px solid #e0e0e0' : '1px solid transparent',
+                color: '#1a1a1a',
+              }}
             >
-              <div className={`flex-shrink-0 p-2 rounded-lg ${
-                i === selectedIndex ? 'bg-space-accent/20 text-space-accent' : 'bg-space-navy/50 text-space-mist/60'
-              }`}>
+              <div
+                className="flex-shrink-0 p-2 rounded-lg"
+                style={{
+                  background: i === selectedIndex ? '#ebebeb' : '#f7f7f7',
+                  color: i === selectedIndex ? '#1a1a1a' : '#888888',
+                }}
+              >
                 {cmd.icon}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{cmd.label}</div>
-                <div className="text-xs text-space-mist/50 truncate">{cmd.description}</div>
+                <div className="text-xs truncate" style={{ color: '#a3a3a3' }}>{cmd.description}</div>
               </div>
             </button>
           ))}
         </div>
 
         {/* Footer hint */}
-        <div className="px-5 py-2.5 border-t border-space-border flex items-center gap-4 text-[10px] font-mono text-space-mist/30">
-          <span>↑↓ navigate</span>
-          <span>↵ select</span>
+        <div
+          className="px-5 py-2.5 flex items-center gap-4 text-[10px] font-mono"
+          style={{ borderTop: '1px solid #ebebeb', color: '#c4c4c4' }}
+        >
+          <span>&#8593;&#8595; navigate</span>
+          <span>&#8629; select</span>
           <span>esc close</span>
         </div>
       </div>

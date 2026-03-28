@@ -34,11 +34,16 @@ export default function DeviceTabs({ active, onChange, capabilities }: Props) {
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200',
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 border',
               isActive
-                ? 'bg-space-accent/15 text-space-accent border border-space-accent/20 shadow-lg shadow-space-accent/5'
-                : 'text-space-mist/50 hover:text-space-mist/80 hover:bg-space-navy/30 border border-transparent',
+                ? 'text-white border-transparent'
+                : 'border-transparent hover:bg-neutral-100',
             )}
+            style={
+              isActive
+                ? { background: '#1a1a1a', color: '#ffffff' }
+                : { color: '#888888' }
+            }
           >
             {tab.icon}
             <span className="hidden sm:inline">{tab.label}</span>

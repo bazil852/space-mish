@@ -53,19 +53,19 @@ export default function SettingsTab({ device }: Props) {
     <div className="max-w-2xl space-y-6">
       {/* Device settings */}
       <div className="glass-card p-6">
-        <h4 className="font-display font-semibold text-space-white flex items-center gap-2 mb-5">
-          <Pencil className="w-4 h-4 text-space-accent" />
+        <h4 className="font-display font-semibold flex items-center gap-2 mb-5" style={{ color: '#1a1a1a' }}>
+          <Pencil className="w-4 h-4" style={{ color: '#888888' }} />
           Device Settings
         </h4>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-space-mist/40 mb-1.5">Display Name</label>
+            <label className="block text-xs mb-1.5" style={{ color: '#a3a3a3' }}>Display Name</label>
             <input value={name} onChange={e => setName(e.target.value)} className="cosmic-input" />
           </div>
 
           <div>
-            <label className="block text-xs text-space-mist/40 mb-1.5">Notes</label>
+            <label className="block text-xs mb-1.5" style={{ color: '#a3a3a3' }}>Notes</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -76,7 +76,7 @@ export default function SettingsTab({ device }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs text-space-mist/40 mb-1.5 flex items-center gap-1.5">
+            <label className="block text-xs mb-1.5 flex items-center gap-1.5" style={{ color: '#a3a3a3' }}>
               <Tag className="w-3 h-3" />
               Tags
             </label>
@@ -86,7 +86,7 @@ export default function SettingsTab({ device }: Props) {
               className="cosmic-input font-mono"
               placeholder="primary, dev, server"
             />
-            <p className="text-[10px] text-space-mist/25 mt-1">Comma-separated</p>
+            <p className="text-[10px] mt-1" style={{ color: '#c4c4c4' }}>Comma-separated</p>
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl glass-surface">
@@ -94,14 +94,14 @@ export default function SettingsTab({ device }: Props) {
               type="checkbox"
               checked={preferred}
               onChange={e => setPreferred(e.target.checked)}
-              className="w-4 h-4 rounded border-space-border bg-space-void text-space-accent focus:ring-space-accent/30"
+              className="w-4 h-4 rounded border-neutral-300 bg-white text-neutral-900 focus:ring-neutral-400"
             />
             <div>
-              <div className="text-sm text-space-white flex items-center gap-1.5">
+              <div className="text-sm flex items-center gap-1.5" style={{ color: '#1a1a1a' }}>
                 <Star className="w-3.5 h-3.5 text-amber-400" />
                 Preferred Device
               </div>
-              <p className="text-[10px] text-space-mist/30 mt-0.5">Show this device prominently on the dashboard</p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#a3a3a3' }}>Show this device prominently on the dashboard</p>
             </div>
           </label>
 
@@ -118,36 +118,39 @@ export default function SettingsTab({ device }: Props) {
 
       {/* Approved directories */}
       <div className="glass-card p-6">
-        <h4 className="font-display font-semibold text-space-white flex items-center gap-2 mb-4">
-          <FolderOpen className="w-4 h-4 text-space-cyan" />
+        <h4 className="font-display font-semibold flex items-center gap-2 mb-4" style={{ color: '#1a1a1a' }}>
+          <FolderOpen className="w-4 h-4" style={{ color: '#888888' }} />
           Approved Directories
         </h4>
-        <p className="text-xs text-space-mist/40 mb-3">
+        <p className="text-xs mb-3" style={{ color: '#a3a3a3' }}>
           The agent only exposes files within these directories. Configure on the agent side.
         </p>
         <div className="space-y-2">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg glass-surface text-sm font-mono text-space-mist/60">
-            <FolderOpen className="w-3.5 h-3.5 text-space-accent/40" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg glass-surface text-sm font-mono" style={{ color: '#888888' }}>
+            <FolderOpen className="w-3.5 h-3.5" style={{ color: '#a3a3a3' }} />
             {device.os === 'windows' ? 'C:\\Users' : '~/'}
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg glass-surface text-sm font-mono text-space-mist/60">
-            <FolderOpen className="w-3.5 h-3.5 text-space-accent/40" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg glass-surface text-sm font-mono" style={{ color: '#888888' }}>
+            <FolderOpen className="w-3.5 h-3.5" style={{ color: '#a3a3a3' }} />
             {device.os === 'windows' ? 'D:\\Projects' : '~/Projects'}
           </div>
         </div>
       </div>
 
       {/* Danger zone */}
-      <div className="glass-card p-6 border-red-500/10">
-        <h4 className="font-display font-semibold text-red-400/70 flex items-center gap-2 mb-4">
+      <div
+        className="glass-card p-6"
+        style={{ borderColor: 'rgba(239,68,68,0.12)', background: 'rgba(239,68,68,0.02)' }}
+      >
+        <h4 className="font-display font-semibold flex items-center gap-2 mb-4" style={{ color: '#ef4444' }}>
           <Shield className="w-4 h-4" />
           Agent Control
         </h4>
         <button
           onClick={restartAgent}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
-                     bg-red-500/10 text-red-400/70 border border-red-500/15
-                     hover:bg-red-500/15 hover:border-red-500/25 transition-all"
+                     transition-all"
+          style={{ background: 'rgba(239,68,68,0.06)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.12)' }}
         >
           <RotateCcw className="w-4 h-4" />
           Restart Agent
