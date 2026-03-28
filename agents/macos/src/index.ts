@@ -102,10 +102,18 @@ app.get('/capabilities', (_req, res) => {
   res.json(ok(doc));
 });
 
+// ─── Helpers: resolve ~ to home dir ─────────────────────────────
+function expandHome(p: string): string {
+  if (p === '~' || p === '~/') return os.homedir();
+  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
+  return p;
+}
+
 // ─── File Routes ─────────────────────────────────────────────────
 app.get('/files', async (req, res) => {
   try {
-    const dirPath = (req.query.path as string) || os.homedir();
+    const rawPath = (req.query.path as string) || '~';
+    const dirPath = expandHome(rawPath);
     const entries = await browseDirectory(dirPath);
     res.json(ok(entries));
   } catch (err) {
@@ -125,7 +133,7 @@ app.post('/files/upload', upload.single('file'), async (req, res) => {
       res.status(400).json(fail('No file uploaded', 400));
       return;
     }
-    const entry = await uploadFile(req.file.buffer, targetPath);
+    const entry = await uploadFile(req.file.buffer, expandHome(targetPath));
     res.json(ok(entry));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -140,12 +148,13 @@ app.get('/files/download', async (req, res) => {
       res.status(400).json(fail('Missing file path', 400));
       return;
     }
-    const info = await getFileInfo(filePath);
+    const resolved = expandHome(filePath);
+    const info = await getFileInfo(resolved);
     res.setHeader('Content-Disposition', `attachment; filename="${info.name}"`);
     if (info.mime) {
       res.setHeader('Content-Type', info.mime);
     }
-    const stream = downloadStream(filePath);
+    const stream = downloadStream(resolved);
     stream.pipe(res);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -160,7 +169,7 @@ app.post('/files/move', async (req, res) => {
       res.status(400).json(fail('Missing source or destination', 400));
       return;
     }
-    const entry = await moveFile(source, destination);
+    const entry = await moveFile(expandHome(source), expandHome(destination));
     res.json(ok(entry));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -175,7 +184,7 @@ app.delete('/files', async (req, res) => {
       res.status(400).json(fail('Missing file path', 400));
       return;
     }
-    await deleteFile(filePath);
+    await deleteFile(expandHome(filePath));
     res.json(ok({ deleted: filePath }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
