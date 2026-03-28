@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { execSync } from 'child_process';
 
 export interface DiscoveredProject {
   id: string;
@@ -43,22 +44,34 @@ const PROJECT_ICONS: Record<string, string> = {
 };
 
 /**
- * Get the directories to scan for projects.
- * Configurable via AGENT_PROJECT_DIRS env var, defaults to ~/Documents
+ * Get the Windows known folders (Documents, Desktop, etc.) automatically.
  */
+function getWindowsDocumentsFolder(): string {
+  // Windows stores the real Documents path in the registry / shell folders
+  // It may be redirected to OneDrive or another drive
+  try {
+    const result = execSync(
+      'powershell -NoProfile -NonInteractive -Command "[Environment]::GetFolderPath(\'MyDocuments\')"',
+      { encoding: 'utf-8', timeout: 5000, windowsHide: true }
+    ).trim();
+    if (result && fs.existsSync(result)) return result;
+  } catch {}
+  // Fallback
+  return path.join(os.homedir(), 'Documents');
+}
+
 function getProjectRoots(): string[] {
   const envDirs = process.env.AGENT_PROJECT_DIRS;
   if (envDirs) {
     return envDirs.split(',').map(d => {
       const trimmed = d.trim();
-      if (trimmed === '~' || trimmed.startsWith('~/')) {
+      if (trimmed === '~' || trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
         return path.join(os.homedir(), trimmed.slice(1));
       }
       return trimmed;
     });
   }
-  // Default: Documents folder
-  return [path.join(os.homedir(), 'Documents')];
+  return [getWindowsDocumentsFolder()];
 }
 
 /**
