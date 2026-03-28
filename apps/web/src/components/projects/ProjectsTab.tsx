@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Code2, Terminal, FolderOpen, Play, ExternalLink, GitBranch,
-  RefreshCw, Square, Loader2, Search, Server,
+  Code2, Terminal, FolderOpen, ExternalLink, GitBranch,
+  RefreshCw, Square, Loader2, Search, Server, Copy, Check,
+  Play,
 } from 'lucide-react';
 import { hubFetch, cn, formatRelativeTime } from '@/lib/utils';
 
@@ -33,116 +34,110 @@ const TYPE_ICONS: Record<string, string> = {
   java: '☕', dotnet: '🔷', cpp: '⚙️', generic: '📁',
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  node: 'text-green-400', rust: 'text-orange-400', go: 'text-cyan-400',
-  python: 'text-yellow-400', java: 'text-red-400', dotnet: 'text-purple-400',
-  cpp: 'text-blue-400', generic: 'text-space-mist/50',
-};
-
 export default function ProjectsTab({ deviceId }: Props) {
   const [projects, setProjects] = useState<DiscoveredProject[]>([]);
   const [sessions, setSessions] = useState<CodeSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [codeServerInstalled, setCodeServerInstalled] = useState<boolean | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Go through hub which proxies to the agent
+      const res = await hubFetch<{ ok: boolean; data: DiscoveredProject[] }>(
+        `/api/projects?deviceId=${deviceId}&deep=true`
+      );
+      if (res.ok && res.data) {
+        setProjects(res.data);
+      }
+    } catch {
+      // Projects endpoint may not be proxying correctly, try empty
+      setProjects([]);
+    }
+    setLoading(false);
+  }, [deviceId]);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await hubFetch<{ ok: boolean; data: CodeSession[] }>(
+        `/api/projects/sessions/${deviceId}`
+      );
+      if (res.ok && res.data) {
+        setSessions(res.data);
+      }
+    } catch {
+      setSessions([]);
+    }
+  }, [deviceId]);
 
   useEffect(() => {
     fetchProjects();
     fetchSessions();
-  }, [deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Poll sessions every 5s
+    const interval = setInterval(fetchSessions, 5000);
+    return () => clearInterval(interval);
+  }, [fetchProjects, fetchSessions]);
 
-  async function fetchProjects() {
-    setLoading(true);
-    try {
-      const res = await hubFetch<{ ok: boolean; data: DiscoveredProject[] }>(
-        `/api/files/browse/${deviceId}?special=projects`
-      );
-      if (res.ok && res.data) {
-        setProjects(res.data);
-        setLoading(false);
-        return;
-      }
-    } catch {}
+  async function launchCodeServer(project: DiscoveredProject) {
+    // Check if already running
+    const existing = sessions.find(s =>
+      s.projectPath === project.path ||
+      s.projectPath.replace(/\\/g, '/') === project.path.replace(/\\/g, '/')
+    );
+    if (existing) {
+      window.open(existing.url, '_blank');
+      return;
+    }
 
-    // Try direct agent projects endpoint via hub proxy
-    try {
-      const res = await hubFetch<{ ok: boolean; data: DiscoveredProject[] }>(
-        `/api/projects?deviceId=${deviceId}`
-      );
-      if (res.ok && res.data) {
-        setProjects(res.data);
-        setLoading(false);
-        return;
-      }
-    } catch {}
-
-    // Direct to agent as fallback
-    try {
-      const agentUrl = `http://${window.location.hostname}:3002`;
-      const res = await fetch(`${agentUrl}/projects?deep=true`);
-      const data = await res.json();
-      if (data.ok && data.data) {
-        setProjects(data.data);
-      }
-    } catch {}
-    setLoading(false);
-  }
-
-  async function fetchSessions() {
-    try {
-      const agentUrl = `http://${window.location.hostname}:3002`;
-      const res = await fetch(`${agentUrl}/projects/sessions`);
-      const data = await res.json();
-      if (data.ok && data.data) {
-        setSessions(data.data);
-      }
-    } catch {}
-  }
-
-  async function openCode(project: DiscoveredProject) {
     setLaunching(project.id);
     try {
-      // Check if already running for this path
-      const existing = sessions.find(s => s.projectPath === project.path);
-      if (existing) {
-        window.open(existing.url, '_blank');
-        setLaunching(null);
-        return;
-      }
+      const res = await hubFetch<{ ok: boolean; data: { url: string; networkUrl: string; port: number }; error?: string }>(
+        `/api/projects/open-code/${deviceId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ projectPath: project.path }),
+        }
+      );
 
-      const agentUrl = `http://${window.location.hostname}:3002`;
-      const res = await fetch(`${agentUrl}/projects/open-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectPath: project.path }),
-      });
-      const data = await res.json();
-      if (data.ok && data.data) {
-        // Wait a moment for code-server to start
-        await new Promise(r => setTimeout(r, 2000));
-        window.open(data.data.networkUrl || data.data.url, '_blank');
+      if (res.ok && res.data) {
+        const url = res.data.networkUrl || res.data.url;
+        // Give code-server 3s to start
+        await new Promise(r => setTimeout(r, 3000));
+        window.open(url, '_blank');
         fetchSessions();
       } else {
-        alert(data.error || 'Failed to start code-server');
+        alert(res.error || 'Failed to launch code-server. Make sure it is installed: npm install -g code-server');
       }
-    } catch (err) {
-      alert('Could not connect to agent. Is it running?');
+    } catch {
+      alert('Could not reach the agent. Is it running?');
     } finally {
       setLaunching(null);
     }
   }
 
-  async function stopCode(port: number) {
+  async function stopCodeSession(port: number) {
     try {
-      const agentUrl = `http://${window.location.hostname}:3002`;
-      await fetch(`${agentUrl}/projects/stop-code`, {
+      await hubFetch(`/api/projects/stop-code/${deviceId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ port }),
       });
       fetchSessions();
     } catch {}
+  }
+
+  function copyUrl(url: string) {
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(url);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  }
+
+  function getSessionForProject(project: DiscoveredProject): CodeSession | undefined {
+    return sessions.find(s =>
+      s.projectPath === project.path ||
+      s.projectPath.replace(/\\/g, '/') === project.path.replace(/\\/g, '/')
+    );
   }
 
   const filtered = filter
@@ -152,8 +147,6 @@ export default function ProjectsTab({ deviceId }: Props) {
       )
     : projects;
 
-  const runningPaths = new Set(sessions.map(s => s.projectPath));
-
   return (
     <div>
       {/* Header */}
@@ -161,65 +154,90 @@ export default function ProjectsTab({ deviceId }: Props) {
         <div>
           <h4 className="font-display font-semibold text-space-white text-lg">Projects</h4>
           <p className="text-xs text-space-mist/40 mt-0.5">
-            Auto-discovered from your Documents folder — {projects.length} found
+            {projects.length} projects found · Tap &quot;Start VS Code&quot; to open a browser IDE session
           </p>
         </div>
         <div className="flex items-center gap-2">
           {sessions.length > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-surface text-xs font-mono">
               <Server className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400">{sessions.length}</span>
-              <span className="text-space-mist/40">running</span>
+              <span className="text-emerald-400 font-bold">{sessions.length}</span>
+              <span className="text-space-mist/40">active</span>
             </div>
           )}
-          <button
-            onClick={() => { fetchProjects(); fetchSessions(); }}
-            className="cosmic-button flex items-center gap-2 text-xs"
-          >
+          <button onClick={() => { fetchProjects(); fetchSessions(); }}
+                  className="cosmic-button flex items-center gap-2 text-xs">
             <RefreshCw className="w-3.5 h-3.5" />
             Rescan
           </button>
         </div>
       </div>
 
-      {/* Running sessions */}
+      {/* ═══════ Active code-server sessions ═══════ */}
       {sessions.length > 0 && (
-        <div className="mb-6">
-          <h5 className="text-xs font-display font-semibold text-space-mist/40 uppercase tracking-widest mb-3">
-            Active Code Sessions
+        <div className="mb-8">
+          <h5 className="text-xs font-display font-semibold text-emerald-400/70 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Running VS Code Sessions
           </h5>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-3">
             {sessions.map(session => (
-              <div key={session.port} className="glass-card p-4 flex items-center gap-3 glow-border">
-                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400">
-                  <Code2 className="w-5 h-5" />
+              <div key={session.port} className="glass-card p-5 border-emerald-500/20 glow-border">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-emerald-500/15 text-emerald-400">
+                    <Code2 className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-display font-semibold text-space-white">
+                      {session.projectPath.split(/[/\\]/).pop()}
+                    </p>
+                    <p className="text-xs font-mono text-space-mist/30 truncate mt-0.5">
+                      {session.projectPath}
+                    </p>
+                    <p className="text-[11px] text-space-mist/40 mt-1">
+                      Port {session.port} · Started {formatRelativeTime(session.startedAt)}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-space-white truncate">
-                    {session.projectPath.split(/[/\\]/).pop()}
-                  </p>
-                  <p className="text-[10px] font-mono text-space-mist/30 truncate">
-                    Port {session.port} · {formatRelativeTime(session.startedAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <a
-                    href={session.url}
-                    target="_blank"
-                    rel="noopener"
-                    className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3"
-                  >
-                    <Code2 className="w-3 h-3" />
-                    Open
-                    <ExternalLink className="w-2.5 h-2.5 opacity-50" />
-                  </a>
-                  <button
-                    onClick={() => stopCode(session.port)}
-                    className="p-1.5 rounded-lg bg-red-500/10 text-red-400/70 hover:bg-red-500/20 transition-all"
-                    title="Stop session"
-                  >
-                    <Square className="w-3.5 h-3.5" />
-                  </button>
+
+                {/* URL + Actions */}
+                <div className="mt-4 p-3 rounded-xl bg-space-void/50 border border-space-border/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <code className="flex-1 text-sm font-mono text-space-accent break-all select-all">
+                      {session.url}
+                    </code>
+                    <button
+                      onClick={() => copyUrl(session.url)}
+                      className="p-2 rounded-lg hover:bg-space-navy/50 text-space-mist/50 hover:text-space-accent transition-all flex-shrink-0"
+                      title="Copy URL"
+                    >
+                      {copiedUrl === session.url
+                        ? <Check className="w-4 h-4 text-emerald-400" />
+                        : <Copy className="w-4 h-4" />
+                      }
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={session.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="cosmic-button-primary flex items-center gap-2 text-sm py-2.5 px-5"
+                    >
+                      <Code2 className="w-4 h-4" />
+                      Open VS Code in Browser
+                      <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                    </a>
+                    <button
+                      onClick={() => stopCodeSession(session.port)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+                                 bg-red-500/10 text-red-400/80 border border-red-500/15
+                                 hover:bg-red-500/20 transition-all"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                      Stop
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -227,30 +245,28 @@ export default function ProjectsTab({ deviceId }: Props) {
         </div>
       )}
 
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-space-mist/30" />
-          <input
-            type="text"
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            placeholder="Filter projects..."
-            className="cosmic-input pl-10"
-          />
+      {/* ═══════ Search ═══════ */}
+      {projects.length > 5 && (
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-space-mist/30" />
+            <input type="text" value={filter} onChange={e => setFilter(e.target.value)}
+                   placeholder="Filter projects..." className="cosmic-input pl-10" />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Projects grid */}
+      {/* ═══════ Projects list ═══════ */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="glass-card p-5 animate-pulse">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-space-navy/50" />
-                <div className="w-32 h-4 rounded bg-space-navy/50" />
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="glass-card p-5 animate-pulse flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-space-navy/50" />
+              <div className="flex-1">
+                <div className="w-40 h-4 rounded bg-space-navy/50 mb-2" />
+                <div className="w-64 h-3 rounded bg-space-navy/30" />
               </div>
-              <div className="w-48 h-3 rounded bg-space-navy/30" />
+              <div className="w-32 h-10 rounded-xl bg-space-navy/30" />
             </div>
           ))}
         </div>
@@ -260,106 +276,102 @@ export default function ProjectsTab({ deviceId }: Props) {
           <h4 className="font-display font-medium text-space-mist/40 mb-1">
             {filter ? 'No matching projects' : 'No projects found'}
           </h4>
-          <p className="text-sm text-space-mist/25 mb-4 max-w-sm">
-            {filter
-              ? 'Try a different search term'
-              : 'No projects detected in your Documents folder. Set AGENT_PROJECT_DIRS in .env to scan other directories.'}
+          <p className="text-sm text-space-mist/25">
+            {filter ? 'Try a different search term' : 'Set AGENT_PROJECT_DIRS in your .env to scan the right folders.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((project, i) => {
-            const isRunning = runningPaths.has(project.path);
+        <div className="space-y-2">
+          {filtered.map((project) => {
+            const session = getSessionForProject(project);
+            const isRunning = !!session;
             const isLaunching = launching === project.id;
-            const session = sessions.find(s => s.projectPath === project.path);
 
             return (
               <div
                 key={project.id}
                 className={cn(
-                  'glass-card p-5 group opacity-0 animate-slide-up',
-                  isRunning && 'border-emerald-500/20',
+                  'glass-card p-4 flex items-center gap-4 transition-all hover:border-space-border-bright',
+                  isRunning && 'border-emerald-500/15 bg-emerald-500/[0.02]',
                 )}
-                style={{ animationDelay: `${Math.min(i, 12) * 0.04}s` }}
               >
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-2.5">
-                  <span className="text-xl">{TYPE_ICONS[project.type] || '📁'}</span>
-                  <div className="flex-1 min-w-0">
+                {/* Icon */}
+                <div className="text-2xl flex-shrink-0 w-10 text-center">
+                  {TYPE_ICONS[project.type] || '📁'}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
                     <h5 className="font-display font-semibold text-space-white text-sm truncate">
                       {project.name}
                     </h5>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={cn('text-[10px] font-mono uppercase', TYPE_COLORS[project.type] || 'text-space-mist/30')}>
-                        {project.type}
+                    {project.hasGit && (
+                      <GitBranch className="w-3 h-3 text-space-mist/25 flex-shrink-0" />
+                    )}
+                    {isRunning && (
+                      <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 flex-shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        live
                       </span>
-                      {project.hasGit && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-space-mist/30">
-                          <GitBranch className="w-2.5 h-2.5" />
-                          git
-                        </span>
-                      )}
-                      {isRunning && (
-                        <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          running
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
+                  <p className="text-[11px] font-mono text-space-mist/25 truncate mt-0.5">
+                    {project.path}
+                  </p>
                 </div>
 
-                {/* Path */}
-                <p className="text-[10px] font-mono text-space-mist/25 truncate mb-3" title={project.path}>
-                  {project.path}
-                </p>
-
-                {/* Modified time */}
-                <p className="text-[10px] text-space-mist/20 mb-3">
-                  Modified {formatRelativeTime(project.lastModified)}
-                </p>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
+                {/* ══ ACTION BUTTON ══ */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {isRunning && session ? (
-                    <a
-                      href={session.url}
-                      target="_blank"
-                      rel="noopener"
-                      className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3"
-                    >
-                      <Code2 className="w-3 h-3" />
-                      Open Editor
-                      <ExternalLink className="w-2.5 h-2.5 opacity-50" />
-                    </a>
+                    <>
+                      <button
+                        onClick={() => copyUrl(session.url)}
+                        className="p-2.5 rounded-xl glass-surface hover:border-space-accent/20 text-space-mist/40 hover:text-space-accent transition-all"
+                        title="Copy URL"
+                      >
+                        {copiedUrl === session.url
+                          ? <Check className="w-4 h-4 text-emerald-400" />
+                          : <Copy className="w-4 h-4" />
+                        }
+                      </button>
+                      <a
+                        href={session.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-semibold
+                                   bg-emerald-500/15 text-emerald-400 border border-emerald-500/20
+                                   hover:bg-emerald-500/25 transition-all"
+                      >
+                        <Code2 className="w-4 h-4" />
+                        Open Editor
+                        <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                      </a>
+                    </>
                   ) : (
                     <button
-                      onClick={() => openCode(project)}
+                      onClick={() => launchCodeServer(project)}
                       disabled={isLaunching}
-                      className="cosmic-button-primary flex items-center gap-1.5 text-[11px] py-1.5 px-3 disabled:opacity-50"
+                      className={cn(
+                        'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold transition-all',
+                        isLaunching
+                          ? 'bg-space-accent/10 text-space-accent/50 border border-space-accent/10'
+                          : 'bg-space-accent/20 text-space-accent border border-space-accent/25 hover:bg-space-accent/30 hover:shadow-lg hover:shadow-space-accent/10',
+                      )}
                     >
                       {isLaunching ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Starting...
+                        </>
                       ) : (
-                        <Code2 className="w-3 h-3" />
+                        <>
+                          <Play className="w-4 h-4" />
+                          Start VS Code
+                        </>
                       )}
-                      {isLaunching ? 'Starting...' : 'Open in VS Code'}
                     </button>
                   )}
-                  <a
-                    href={`/devices/${deviceId}?tab=terminal`}
-                    className="cosmic-button flex items-center gap-1.5 text-[11px] py-1.5 px-3"
-                  >
-                    <Terminal className="w-3 h-3" />
-                    Shell
-                  </a>
-                  <a
-                    href={`/devices/${deviceId}?tab=files`}
-                    className="cosmic-button flex items-center gap-1.5 text-[11px] py-1.5 px-3"
-                  >
-                    <FolderOpen className="w-3 h-3" />
-                    Files
-                  </a>
                 </div>
               </div>
             );
@@ -367,18 +379,15 @@ export default function ProjectsTab({ deviceId }: Props) {
         </div>
       )}
 
-      {/* code-server install hint */}
-      {!loading && projects.length > 0 && codeServerInstalled === false && (
-        <div className="mt-6 glass-surface p-4 rounded-xl">
-          <p className="text-sm text-amber-400/70 mb-2 font-medium">code-server not detected</p>
-          <p className="text-xs text-space-mist/40 mb-2">
-            Install code-server to open VS Code in your browser:
-          </p>
-          <code className="text-xs font-mono text-space-accent/70 bg-space-void/40 px-2 py-1 rounded">
-            npm install -g code-server
-          </code>
-        </div>
-      )}
+      {/* Install hint */}
+      <div className="mt-8 glass-surface p-4 rounded-xl">
+        <p className="text-xs text-space-mist/30 mb-1 font-display font-medium">Prerequisites</p>
+        <p className="text-[11px] text-space-mist/20">
+          Install <code className="text-space-accent/50 bg-space-void/40 px-1 rounded">code-server</code> on your Windows machine:{' '}
+          <code className="text-space-accent/50 bg-space-void/40 px-1 rounded">npm install -g code-server</code>
+          {' '}— then tap &quot;Start VS Code&quot; on any project. Copy the URL and open it on your iPad.
+        </p>
+      </div>
     </div>
   );
 }
