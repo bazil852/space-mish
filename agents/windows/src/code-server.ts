@@ -1,35 +1,33 @@
 import { execSync, spawn, ChildProcess } from 'child_process';
 import * as os from 'os';
+import * as readline from 'readline';
 
-interface VSCodeInstance {
-  port: number;
+interface TunnelState {
+  process: ChildProcess | null;
+  url: string | null;
+  machineName: string | null;
+  status: 'stopped' | 'starting' | 'running' | 'needs-auth';
+  authMessage: string | null;
+  startedAt: string | null;
+}
+
+interface ProjectSession {
   projectPath: string;
-  process: ChildProcess;
   url: string;
-  networkUrl: string;
   startedAt: string;
-  mode: 'serve-web' | 'tunnel' | 'code-server';
 }
 
-const instances = new Map<number, VSCodeInstance>();
+const tunnel: TunnelState = {
+  process: null, url: null, machineName: null,
+  status: 'stopped', authMessage: null, startedAt: null,
+};
 
-function getLocalIp(): string {
-  for (const ifaces of Object.values(os.networkInterfaces())) {
-    for (const iface of ifaces || []) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
-    }
-  }
-  return '0.0.0.0';
-}
+const projectSessions = new Map<string, ProjectSession>();
 
 /**
- * Check what's available: official VS Code CLI, or code-server as fallback.
+ * Check if VS Code CLI is available.
  */
 export function isInstalled(): boolean {
-  return hasVSCode() || hasCodeServer();
-}
-
-function hasVSCode(): boolean {
   try {
     execSync('where code', { encoding: 'utf-8', timeout: 5000, windowsHide: true, stdio: 'pipe' });
     return true;
@@ -38,150 +36,181 @@ function hasVSCode(): boolean {
   }
 }
 
-function hasCodeServer(): boolean {
-  try {
-    execSync('where code-server', { encoding: 'utf-8', timeout: 5000, windowsHide: true, stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * Start a VS Code web server for the given project.
- * Tries official `code serve-web` first, falls back to `code-server`.
+ * Start the VS Code tunnel if not already running.
+ * Returns the tunnel URL or an auth message if first-time setup is needed.
  */
 export function startCodeServer(
   projectPath: string,
-  port: number,
+  _port: number = 0,
 ): { url: string; networkUrl: string; port: number; mode: string } {
-  // Check if already running on this port
-  if (instances.has(port)) {
-    const existing = instances.get(port)!;
-    return { url: existing.url, networkUrl: existing.networkUrl, port: existing.port, mode: existing.mode };
+  if (!isInstalled()) {
+    throw new Error(
+      'VS Code is not installed. Install it from https://code.visualstudio.com/ — the tunnel feature is built in.'
+    );
   }
 
-  // Also check if this project is already open on a different port
-  for (const inst of instances.values()) {
-    if (inst.projectPath === projectPath) {
-      return { url: inst.url, networkUrl: inst.networkUrl, port: inst.port, mode: inst.mode };
+  // If tunnel is running and we have a URL, just return it with the project folder
+  if (tunnel.status === 'running' && tunnel.url) {
+    const projectUrl = buildProjectUrl(tunnel.url, projectPath);
+    trackProject(projectPath, projectUrl);
+    return { url: projectUrl, networkUrl: projectUrl, port: 0, mode: 'tunnel' };
+  }
+
+  // If tunnel needs auth, tell the user
+  if (tunnel.status === 'needs-auth' && tunnel.authMessage) {
+    throw new Error(tunnel.authMessage);
+  }
+
+  // Start the tunnel
+  if (tunnel.status === 'stopped' || tunnel.status === 'needs-auth') {
+    launchTunnel();
+  }
+
+  // If still starting, wait briefly for URL
+  if (tunnel.status === 'starting') {
+    // Give it a few seconds
+    const start = Date.now();
+    while (Date.now() - start < 10000) {
+      if (tunnel.url) {
+        const projectUrl = buildProjectUrl(tunnel.url, projectPath);
+        trackProject(projectPath, projectUrl);
+        return { url: projectUrl, networkUrl: projectUrl, port: 0, mode: 'tunnel' };
+      }
+      if (tunnel.status === 'needs-auth') {
+        throw new Error(tunnel.authMessage || 'Authentication required. Run "code tunnel" manually once to authenticate.');
+      }
+      // Busy wait (this is in a sync context)
+      execSync('timeout /t 1 /nobreak >nul 2>&1', { windowsHide: true, stdio: 'ignore' });
     }
   }
 
-  const ip = getLocalIp();
-
-  // Try official VS Code first
-  if (hasVSCode()) {
-    return startVSCodeServeWeb(projectPath, port, ip);
-  }
-
-  // Fallback to code-server
-  if (hasCodeServer()) {
-    return startCodeServerFallback(projectPath, port, ip);
+  if (tunnel.url) {
+    const projectUrl = buildProjectUrl(tunnel.url, projectPath);
+    trackProject(projectPath, projectUrl);
+    return { url: projectUrl, networkUrl: projectUrl, port: 0, mode: 'tunnel' };
   }
 
   throw new Error(
-    'VS Code is not installed. Install Visual Studio Code from https://code.visualstudio.com/ ' +
-    '— the "code" CLI is included and enables browser-based editing.'
+    'Tunnel is starting up. Try again in a few seconds. If this is your first time, ' +
+    'run "code tunnel" in a terminal on this machine to complete one-time authentication.'
   );
 }
 
-function startVSCodeServeWeb(
-  projectPath: string,
-  port: number,
-  ip: string,
-): { url: string; networkUrl: string; port: number; mode: string } {
-  // `code serve-web` serves the full VS Code UI on a local port
+function buildProjectUrl(tunnelBaseUrl: string, projectPath: string): string {
+  // tunnelBaseUrl is like https://vscode.dev/tunnel/machine-name
+  // Append the folder path
+  const folderParam = encodeURIComponent(projectPath);
+  return `${tunnelBaseUrl}/${folderParam}`;
+}
+
+function trackProject(projectPath: string, url: string) {
+  if (!projectSessions.has(projectPath)) {
+    projectSessions.set(projectPath, {
+      projectPath, url, startedAt: new Date().toISOString(),
+    });
+  }
+}
+
+function launchTunnel() {
+  if (tunnel.process) return;
+
+  tunnel.status = 'starting';
+  tunnel.authMessage = null;
+  console.log('[vscode] Starting VS Code tunnel...');
+
   const child = spawn('code', [
-    'serve-web',
-    '--port', String(port),
-    '--host', '0.0.0.0',
-    '--without-connection-token',
+    'tunnel',
     '--accept-server-license-terms',
   ], {
-    detached: true,
-    stdio: 'ignore',
     shell: true,
-    cwd: projectPath,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
 
-  child.unref();
+  tunnel.process = child;
 
-  const url = `http://localhost:${port}`;
-  const networkUrl = `http://${ip}:${port}`;
+  // Read stdout line by line to find the URL or auth code
+  if (child.stdout) {
+    const rl = readline.createInterface({ input: child.stdout });
+    rl.on('line', (line) => {
+      console.log(`[vscode-tunnel] ${line}`);
 
-  instances.set(port, {
-    port, projectPath, process: child,
-    url, networkUrl,
-    startedAt: new Date().toISOString(),
-    mode: 'serve-web',
+      // Look for the tunnel URL
+      const urlMatch = line.match(/(https:\/\/vscode\.dev\/tunnel\/[^\s]+)/);
+      if (urlMatch) {
+        tunnel.url = urlMatch[1];
+        tunnel.machineName = urlMatch[1].replace('https://vscode.dev/tunnel/', '').split('/')[0];
+        tunnel.status = 'running';
+        tunnel.startedAt = new Date().toISOString();
+        console.log(`[vscode] Tunnel ready: ${tunnel.url}`);
+      }
+
+      // Look for device code authentication prompt
+      if (line.includes('github.com/login/device') || line.includes('use code')) {
+        const codeMatch = line.match(/code\s+([A-Z0-9]{4}-[A-Z0-9]{4})/);
+        const deviceCode = codeMatch ? codeMatch[1] : '';
+        tunnel.status = 'needs-auth';
+        tunnel.authMessage =
+          `First-time setup required. Go to https://github.com/login/device and enter code: ${deviceCode}. ` +
+          `Or run "code tunnel" in a terminal on this machine to complete authentication.`;
+        console.log(`[vscode] Auth required: ${tunnel.authMessage}`);
+      }
+    });
+  }
+
+  if (child.stderr) {
+    const errRl = readline.createInterface({ input: child.stderr });
+    errRl.on('line', (line) => {
+      console.log(`[vscode-tunnel-err] ${line}`);
+      // Sometimes the URL appears in stderr
+      const urlMatch = line.match(/(https:\/\/vscode\.dev\/tunnel\/[^\s]+)/);
+      if (urlMatch) {
+        tunnel.url = urlMatch[1];
+        tunnel.machineName = urlMatch[1].replace('https://vscode.dev/tunnel/', '').split('/')[0];
+        tunnel.status = 'running';
+        tunnel.startedAt = new Date().toISOString();
+      }
+    });
+  }
+
+  child.on('exit', (code) => {
+    console.log(`[vscode] Tunnel process exited with code ${code}`);
+    tunnel.process = null;
+    tunnel.status = 'stopped';
+    // Don't clear the URL — tunnel may have been stopped but the URL might still work
+    // if the service is running separately
   });
-
-  console.log(`[vscode] serve-web started on port ${port} for ${projectPath}`);
-  return { url, networkUrl, port, mode: 'serve-web' };
-}
-
-function startCodeServerFallback(
-  projectPath: string,
-  port: number,
-  ip: string,
-): { url: string; networkUrl: string; port: number; mode: string } {
-  const child = spawn('code-server', [
-    '--port', String(port),
-    '--auth', 'none',
-    '--bind-addr', `0.0.0.0:${port}`,
-    projectPath,
-  ], {
-    detached: true,
-    stdio: 'ignore',
-    shell: true,
-  });
-
-  child.unref();
-
-  const url = `http://localhost:${port}`;
-  const networkUrl = `http://${ip}:${port}`;
-
-  instances.set(port, {
-    port, projectPath, process: child,
-    url, networkUrl,
-    startedAt: new Date().toISOString(),
-    mode: 'code-server',
-  });
-
-  console.log(`[code-server] Started on port ${port} for ${projectPath}`);
-  return { url, networkUrl, port, mode: 'code-server' };
 }
 
 /**
- * Stop an instance running on the given port.
+ * Stop the tunnel.
  */
-export function stopCodeServer(port: number): boolean {
-  const instance = instances.get(port);
-  if (!instance) return false;
-
-  try {
-    // On Windows, need to kill the process tree
-    if (instance.process.pid) {
-      try {
-        execSync(`taskkill /PID ${instance.process.pid} /T /F`, {
+export function stopCodeServer(_port: number = 0): boolean {
+  if (tunnel.process) {
+    try {
+      if (tunnel.process.pid) {
+        execSync(`taskkill /PID ${tunnel.process.pid} /T /F`, {
           timeout: 5000, windowsHide: true, stdio: 'ignore',
         });
-      } catch {
-        instance.process.kill();
       }
-    } else {
-      instance.process.kill();
+    } catch {
+      try { tunnel.process.kill(); } catch {}
     }
-  } catch {}
-
-  instances.delete(port);
-  console.log(`[vscode] Stopped on port ${port}`);
-  return true;
+    tunnel.process = null;
+    tunnel.status = 'stopped';
+    tunnel.url = null;
+    tunnel.machineName = null;
+    tunnel.startedAt = null;
+    projectSessions.clear();
+    console.log('[vscode] Tunnel stopped');
+    return true;
+  }
+  return false;
 }
 
 /**
- * Get all running instances.
+ * Get running instances info.
  */
 export function getRunningInstances(): Array<{
   port: number;
@@ -191,12 +220,50 @@ export function getRunningInstances(): Array<{
   startedAt: string;
   mode: string;
 }> {
-  return Array.from(instances.values()).map((i) => ({
-    port: i.port,
-    projectPath: i.projectPath,
-    url: i.url,
-    networkUrl: i.networkUrl,
-    startedAt: i.startedAt,
-    mode: i.mode,
-  }));
+  const result: Array<{
+    port: number; projectPath: string; url: string; networkUrl: string; startedAt: string; mode: string;
+  }> = [];
+
+  // Add the tunnel itself if running
+  if (tunnel.status === 'running' && tunnel.url) {
+    result.push({
+      port: 0,
+      projectPath: 'VS Code Tunnel',
+      url: tunnel.url,
+      networkUrl: tunnel.url,
+      startedAt: tunnel.startedAt || new Date().toISOString(),
+      mode: 'tunnel',
+    });
+  }
+
+  // Add tracked project sessions
+  for (const session of projectSessions.values()) {
+    result.push({
+      port: 0,
+      projectPath: session.projectPath,
+      url: session.url,
+      networkUrl: session.url,
+      startedAt: session.startedAt,
+      mode: 'tunnel',
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Get tunnel status.
+ */
+export function getTunnelStatus(): {
+  status: string;
+  url: string | null;
+  machineName: string | null;
+  authMessage: string | null;
+} {
+  return {
+    status: tunnel.status,
+    url: tunnel.url,
+    machineName: tunnel.machineName,
+    authMessage: tunnel.authMessage,
+  };
 }

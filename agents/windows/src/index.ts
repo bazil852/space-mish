@@ -39,6 +39,7 @@ import {
   startCodeServer,
   stopCodeServer,
   getRunningInstances,
+  getTunnelStatus,
 } from './code-server';
 import {
   captureScreenshot,
@@ -329,7 +330,12 @@ app.post('/projects/open-code', (req, res) => {
   }
 });
 
-// Stop a code-server instance
+// Get tunnel status
+app.get('/projects/tunnel-status', (_req, res) => {
+  res.json(ok(getTunnelStatus()));
+});
+
+// Stop the tunnel / code-server
 app.post('/projects/stop-code', (req, res) => {
   const { port } = req.body;
   if (!port) {
