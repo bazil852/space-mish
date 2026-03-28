@@ -84,6 +84,19 @@ export function resizeSession(id: string, cols: number, rows: number): boolean {
 }
 
 /**
+ * Close ALL terminal sessions. Returns number killed.
+ */
+export function closeAllSessions(): number {
+  let count = 0;
+  for (const [id, session] of sessions) {
+    try { session.pty.kill(); } catch {}
+    sessions.delete(id);
+    count++;
+  }
+  return count;
+}
+
+/**
  * Write data to a session's terminal.
  */
 export function writeToSession(id: string, data: string): boolean {
