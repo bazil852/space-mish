@@ -87,6 +87,7 @@ export function initDatabase(): Database.Database {
   _db.pragma("foreign_keys = ON");
 
   createTables(_db);
+  cleanupDemoDevices(_db);
 
   return _db;
 }
@@ -167,6 +168,18 @@ function createTables(db: Database.Database): void {
 }
 
 // ─── Demo seed ───────────────────────────────────────────────────
+
+function cleanupDemoDevices(db: Database.Database): void {
+  // Remove fake seed devices from earlier versions
+  const deleted = db.prepare(
+    `DELETE FROM devices WHERE name IN ('Mac Studio', 'Dev Server')
+     OR local_ip IN ('192.168.1.10', '192.168.1.20')
+     OR hostname IN ('mac-studio.local', 'dev-server.local')`
+  ).run();
+  if (deleted.changes > 0) {
+    console.log(`[db] Cleaned up ${deleted.changes} demo device(s)`);
+  }
+}
 
 function seedDemoDevices(db: Database.Database): void {
   const count = db.prepare("SELECT COUNT(*) AS cnt FROM devices").get() as {
