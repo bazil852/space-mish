@@ -87,7 +87,6 @@ export function initDatabase(): Database.Database {
   _db.pragma("foreign_keys = ON");
 
   createTables(_db);
-  seedDemoDevices(_db);
 
   return _db;
 }

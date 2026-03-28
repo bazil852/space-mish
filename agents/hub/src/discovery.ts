@@ -84,13 +84,17 @@ function handleServiceUp(
   const localIp =
     service.addresses?.find((a) => a.includes(".")) || "0.0.0.0";
 
+  // Agents send capabilities as a comma-separated string: "clipboard,files,terminal,projects,code-server"
+  const capList = (txt.capabilities || "").toLowerCase().split(",").map((c) => c.trim());
+  const hasCap = (name: string) => capList.includes(name);
+
   const capabilities: DeviceCapabilities = {
-    clipboardRead: txt.clipboardRead === "true",
-    clipboardWrite: txt.clipboardWrite === "true",
-    files: txt.files !== "false",
-    terminal: txt.terminal !== "false",
-    codeServer: txt.codeServer === "true",
-    remoteView: txt.remoteView === "true",
+    clipboardRead: hasCap("clipboard") || txt.clipboardRead === "true",
+    clipboardWrite: hasCap("clipboard") || txt.clipboardWrite === "true",
+    files: hasCap("files") || txt.files === "true" || txt.files !== "false",
+    terminal: hasCap("terminal") || txt.terminal === "true" || txt.terminal !== "false",
+    codeServer: hasCap("code-server") || txt.codeServer === "true",
+    remoteView: hasCap("remote-view") || txt.remoteView === "true",
   };
 
   const device = upsertDevice({

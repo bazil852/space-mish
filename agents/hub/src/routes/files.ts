@@ -26,7 +26,7 @@ router.get("/browse/:deviceId", async (req: Request, res: Response) => {
 
     try {
       const agentRes = await fetch(
-        `${agentUrl}/files/browse?path=${encodeURIComponent(dirPath)}`,
+        `${agentUrl}/files?path=${encodeURIComponent(dirPath)}`,
         { signal: controller.signal }
       );
       clearTimeout(timeout);
@@ -215,7 +215,7 @@ router.delete("/:deviceId", async (req: Request, res: Response) => {
 
     try {
       const agentRes = await fetch(
-        `${agentUrl}/files/delete?path=${encodeURIComponent(filePath)}`,
+        `${agentUrl}/files?path=${encodeURIComponent(filePath)}`,
         {
           method: "DELETE",
           signal: controller.signal,

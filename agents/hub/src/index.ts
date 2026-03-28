@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 
-import { initDatabase } from "./database";
+import { initDatabase, upsertDevice } from "./database";
 import { setupWebSocket, broadcast } from "./websocket";
 import { startDiscovery } from "./discovery";
 
@@ -16,6 +16,7 @@ import filesRouter from "./routes/files";
 import terminalRouter from "./routes/terminal";
 import projectsRouter from "./routes/projects";
 import commandsRouter from "./routes/commands";
+import os from "os";
 
 // ─── Configuration ───────────────────────────────────────────────
 
@@ -52,6 +53,49 @@ app.use("/api/terminal", terminalRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/commands", commandsRouter);
 
+// ─── Agent self-registration endpoint ─────────────────────────────
+// Agents POST here on startup to register themselves with the hub
+app.post("/api/agents/register", (req, res) => {
+  try {
+    const { deviceId, deviceName, os: agentOs, port, capabilities } = req.body;
+    // Get the agent's IP from the request
+    const agentIp =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress?.replace("::ffff:", "") ||
+      "127.0.0.1";
+
+    const capList = Array.isArray(capabilities) ? capabilities : [];
+    const hasCap = (name: string) => capList.some((c: string) => c.toLowerCase().includes(name));
+
+    const device = upsertDevice({
+      id: deviceId,
+      name: deviceName || "Agent",
+      hostname: deviceName || agentIp,
+      os: agentOs || "linux",
+      localIp: agentIp,
+      online: true,
+      capabilities: {
+        clipboardRead: hasCap("clipboard"),
+        clipboardWrite: hasCap("clipboard"),
+        files: hasCap("files"),
+        terminal: hasCap("terminal"),
+        codeServer: hasCap("code-server"),
+        remoteView: hasCap("remote"),
+      },
+      tags: [],
+      preferred: false,
+      notes: "",
+      agentPort: port || 3002,
+    });
+
+    broadcast("device:online", device);
+    console.log(`[register] Agent registered: ${device.name} (${device.localIp}:${device.agentPort})`);
+    res.status(201).json({ ok: true, data: device });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ─── 404 fallback ────────────────────────────────────────────────
 
 app.use((_req, res) => {
@@ -75,7 +119,7 @@ app.use(
 // ─── Bootstrap ───────────────────────────────────────────────────
 
 function main(): void {
-  // 1. Initialize database (creates tables + seeds demo devices)
+  // 1. Initialize database
   const db = initDatabase();
   console.log("[db] SQLite database initialized");
 

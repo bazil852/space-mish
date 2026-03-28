@@ -49,7 +49,7 @@ const AGENT_PORT = parseInt(process.env.AGENT_PORT || '3002', 10);
 const AGENT_VERSION = '1.0.0';
 const DEVICE_ID = crypto.createHash('sha256').update(os.hostname()).digest('hex').slice(0, 12);
 const DEVICE_NAME = process.env.AGENT_DEVICE_NAME || os.hostname();
-const HUB_URL = process.env.HUB_URL;
+const HUB_URL = process.env.AGENT_HUB_URL || process.env.HUB_URL;
 
 // ─── Express + HTTP Server ───────────────────────────────────────
 const app = express();
