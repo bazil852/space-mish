@@ -15,8 +15,6 @@ function getGreeting(): string {
 export default function Dashboard() {
   const { devices, loading, refetch } = useDevices();
 
-  const online = devices.filter(d => d.online).length;
-
   return (
     <>
       <Topbar />
@@ -24,39 +22,25 @@ export default function Dashboard() {
       <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-6 pb-16 max-w-5xl mx-auto w-full">
 
         {/* Greeting with orb */}
-        <div className="flex flex-col items-center text-center pt-8 pb-10">
-          {/* Purple orb */}
-          <div className="orb-container mb-6 opacity-0 animate-fade-in">
+        <div className="flex flex-col items-center text-center pt-10 pb-12">
+          <div className="orb-container mb-7 opacity-0 animate-fade-in">
             <div className="orb">
               <div className="orb-inner" />
               <div className="orb-glow" />
             </div>
           </div>
 
-          {/* Greeting text */}
           <h2
-            className="font-display font-bold text-2xl sm:text-3xl tracking-tight opacity-0 animate-slide-up"
-            style={{ color: '#1a1a1a', animationDelay: '0.2s' }}
+            className="font-display font-bold text-2xl sm:text-[28px] tracking-tight opacity-0 animate-slide-up"
+            style={{ color: '#1a1a1a', animationDelay: '0.15s' }}
           >
             {getGreeting()}, <span style={{ color: '#8b5cf6' }}>Bazil</span>
           </h2>
-          <p
-            className="text-sm mt-2 opacity-0 animate-slide-up"
-            style={{ color: '#a3a3a3', animationDelay: '0.35s' }}
-          >
-            {online > 0
-              ? `${online} device${online > 1 ? 's' : ''} online and ready`
-              : 'Waiting for devices to connect'
-            }
-          </p>
         </div>
 
         {/* Section label */}
         {devices.length > 0 && (
-          <div
-            className="flex items-center gap-2 mb-4 opacity-0 animate-fade-in"
-            style={{ animationDelay: '0.45s' }}
-          >
+          <div className="flex items-center gap-2 mb-4 opacity-0 animate-fade-in" style={{ animationDelay: '0.3s' }}>
             <h3 className="text-xs font-display font-semibold uppercase tracking-widest" style={{ color: '#a3a3a3' }}>
               Devices
             </h3>
@@ -67,7 +51,7 @@ export default function Dashboard() {
         {/* Device grid */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[0, 1, 2].map(i => (
+            {[0, 1].map(i => (
               <div key={i} className="glass-card p-6 animate-pulse">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl" style={{ background: '#f0f0f0' }} />
@@ -80,25 +64,25 @@ export default function Dashboard() {
             ))}
           </div>
         ) : devices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 opacity-0 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+          <div className="flex flex-col items-center justify-center py-16 opacity-0 animate-fade-in" style={{ animationDelay: '0.4s' }}>
             <div
-              className="w-16 h-16 rounded-[18px] flex items-center justify-center mb-6"
+              className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-5"
               style={{ background: '#f7f7f7', border: '1px solid #e5e5e5' }}
             >
-              <Satellite className="w-7 h-7" style={{ color: '#c4c4c4' }} />
+              <Satellite className="w-6 h-6" style={{ color: '#c4c4c4' }} />
             </div>
-            <p className="text-sm mb-6 text-center max-w-xs leading-relaxed" style={{ color: '#a3a3a3' }}>
-              No devices found on your network yet.
+            <p className="text-sm mb-5 text-center max-w-xs" style={{ color: '#a3a3a3' }}>
+              No devices found on your network.
             </p>
             <button onClick={refetch} className="cosmic-button flex items-center gap-2">
               <RefreshCw className="w-4 h-4" />
-              <span>Scan Network</span>
+              Scan
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {devices.map((device, index) => (
-              <DeviceCard key={device.id} device={device} index={index + 3} />
+              <DeviceCard key={device.id} device={device} index={index} />
             ))}
           </div>
         )}
